@@ -1,0 +1,51 @@
+# SQL Checker Configuration
+
+# Database connections for EXPLAIN analysis
+database:
+  connections:
+    default:
+      name: Default MySQL
+      type: mysql
+      host: localhost
+      port: 3306
+      database: your_database
+      username: your_username
+      password: your_password
+      parameters:
+        useSSL: false
+        serverTimezone: UTC
+
+# Scan settings
+scan:
+  includes:
+    - "**/*.java"
+    - "**/*.xml"
+    - "**/*.js"
+    - "**/*.ts"
+  excludes:
+    - "**/node_modules/**"
+    - "**/target/**"
+    - "**/build/**"
+    - "**/.git/**"
+  maxFileSizeMb: 10
+  parallelism: 4
+
+# Analysis settings
+analysis:
+  explainEnabled: true
+  expertEnabled: true
+  timeoutSeconds: 30
+  maxThreads: 4
+
+# Report settings
+report:
+  theme: feishu
+  defaultOutputDir: ./reports
+  includeSqlDetails: true
+  includeCodeSnippets: true
+  themeColor:
+    primary: "#3370FF"
+    success: "#00B628"
+    warning: "#FF8800"
+    error: "#F54A45"
+    info: "#4C5C76"

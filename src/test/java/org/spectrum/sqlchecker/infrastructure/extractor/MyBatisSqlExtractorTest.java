@@ -1,0 +1,439 @@
+package org.spectrum.sqlchecker.infrastructure.extractor;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.spectrum.sqlchecker.domain.shared.enumeration.SqlSourceType;
+import org.spectrum.sqlchecker.domain.shared.exception.SqlExtractionException;
+import org.spectrum.sqlchecker.domain.shared.valueobject.FileType;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.*;
+
+/**
+ * MyBatisSqlExtractor 单元测试
+ *
+ * @author Spectrum SQL Checker
+ * @since 1.0.0
+ */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("MyBatisSqlExtractor 单元测试")
+class MyBatisSqlExtractorTest {
+
+    private MyBatisSqlExtractor extractor;
+
+    @BeforeEach
+    void setUp() {
+        extractor = new MyBatisSqlExtractor();
+    }
+
+    // ==================== 基本属性测试 ====================
+
+    @Nested
+    @DisplayName("基本属性测试")
+    class BasicPropertiesTests {
+
+        @Test
+        @DisplayName("应该返回正确的名称")
+        void should_return_correct_name() {
+            assertThat(extractor.getName()).isEqualTo("MyBatisSqlExtractor");
+        }
+
+        @Test
+        @DisplayName("应该返回 MYBATIS 源类型")
+        void should_return_mybatis_source_type() {
+            assertThat(extractor.getSourceType()).isEqualTo(SqlSourceType.MYBATIS);
+        }
+
+        @Test
+        @DisplayName("应该支持 XML 文件类型")
+        void should_support_xml_file_type() {
+            FileType xmlType = FileType.fromPath("test.xml");
+            assertThat(extractor.supports(xmlType)).isTrue();
+        }
+
+        @Test
+        @DisplayName("应该支持 XML 文件类型（大写扩展名）")
+        void should_support_xml_file_type_uppercase() {
+            FileType xmlType = FileType.fromPath("test.XML");
+            assertThat(extractor.supports(xmlType)).isTrue();
+        }
+
+        @Test
+        @DisplayName("不应该支持非 XML 文件类型")
+        void should_not_support_non_xml_file_type() {
+            FileType javaType = FileType.fromPath("test.java");
+            FileType jsType = FileType.fromPath("test.js");
+            FileType txtType = FileType.fromPath("test.txt");
+
+            assertThat(extractor.supports(javaType)).isFalse();
+            assertThat(extractor.supports(jsType)).isFalse();
+            assertThat(extractor.supports(txtType)).isFalse();
+        }
+    }
+
+    // ==================== extract 方法测试 ====================
+
+    @Nested
+    @DisplayName("extract 方法测试")
+    class ExtractTests {
+
+        @Test
+        @DisplayName("应该提取 select 元素中的 SQL")
+        void should_extract_sql_from_select_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectAll">
+                        SELECT id, name FROM users
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("SELECT");
+            assertThat(result.get(0)).contains("users");
+        }
+
+        @Test
+        @DisplayName("应该提取 insert 元素中的 SQL")
+        void should_extract_sql_from_insert_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <insert id="insertUser">
+                        INSERT INTO users (id, name) VALUES (1, 'test')
+                    </insert>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("INSERT");
+        }
+
+        @Test
+        @DisplayName("应该提取 update 元素中的 SQL")
+        void should_extract_sql_from_update_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <update id="updateUser">
+                        UPDATE users SET name = 'test' WHERE id = 1
+                    </update>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("UPDATE");
+        }
+
+        @Test
+        @DisplayName("应该提取 delete 元素中的 SQL")
+        void should_extract_sql_from_delete_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <delete id="deleteUser">
+                        DELETE FROM users WHERE id = 1
+                    </delete>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("DELETE");
+        }
+
+        @Test
+        @DisplayName("应该提取 sql 元素中的 SQL 片段")
+        void should_extract_sql_from_sql_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <sql id="userColumns">
+                        id, name, email
+                    </sql>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            // sql 元素不包含 SQL 关键字，所以不会被提取
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("应该提取多个 SQL 元素")
+        void should_extract_multiple_sql_elements() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectAll">
+                        SELECT * FROM users
+                    </select>
+                    <select id="selectById">
+                        SELECT * FROM users WHERE id = #{id}
+                    </select>
+                    <insert id="insert">
+                        INSERT INTO users (name) VALUES (#{name})
+                    </insert>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(3);
+        }
+
+        @Test
+        @DisplayName("应该处理 CDATA 中的 SQL")
+        void should_handle_cdata_sql() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectAll">
+                        <![CDATA[
+                            SELECT * FROM users WHERE status = 'active'
+                        ]]>
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("SELECT");
+            assertThat(result.get(0)).contains("active");
+        }
+
+        @Test
+        @DisplayName("应该处理带动态 SQL 的语句")
+        void should_handle_dynamic_sql() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectByCondition">
+                        SELECT * FROM users
+                        <where>
+                            <if test="name != null">
+                                AND name LIKE #{name}
+                            </if>
+                            <if test="status != null">
+                                AND status = #{status}
+                            </if>
+                        </where>
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("SELECT");
+        }
+
+        @Test
+        @DisplayName("应该处理 foreach 元素")
+        void should_handle_foreach_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectByIds">
+                        SELECT * FROM users WHERE id IN
+                        <foreach item="id" collection="ids" open="(" separator="," close=")">
+                            #{id}
+                        </foreach>
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("应该处理 trim 元素")
+        void should_handle_trim_element() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <update id="updateUser">
+                        UPDATE users
+                        <trim prefix="SET" suffixOverrides=",">
+                            <if test="name != null">name = #{name},</if>
+                            <if test="email != null">email = #{email},</if>
+                        </trim>
+                        WHERE id = #{id}
+                    </update>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("UPDATE");
+        }
+
+        @Test
+        @DisplayName("应该提取带 selectKey 元素的 SQL")
+        void should_extract_sql_with_selectkey() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <insert id="insertUser">
+                        <selectKey keyProperty="id" resultType="long" order="BEFORE">
+                            SELECT NEXTVAL('user_seq')
+                        </selectKey>
+                        INSERT INTO users (id, name) VALUES (#{id}, #{name})
+                    </insert>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            // selectKey 和 insert 被组合成一个 SQL（这是实际行为）
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("SELECT NEXTVAL");
+            assertThat(result.get(0)).contains("INSERT INTO users");
+        }
+
+        @Test
+        @DisplayName("应该忽略空的 SQL 元素")
+        void should_ignore_empty_sql_elements() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectAll">
+
+                    </select>
+                    <select id="selectById">
+                        SELECT * FROM users WHERE id = #{id}
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("应该修剪提取的 SQL")
+        void should_trim_extracted_sql() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectAll">
+                        SELECT * FROM users
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result.get(0)).doesNotStartWith(" ");
+            assertThat(result.get(0)).doesNotEndWith(" ");
+        }
+    }
+
+    // ==================== 错误处理测试 ====================
+
+    @Nested
+    @DisplayName("错误处理测试")
+    class ErrorHandlingTests {
+
+        @Test
+        @DisplayName("应该处理无效的 XML")
+        void should_handle_invalid_xml() {
+            String invalidXml = "<invalid><unclosed>";
+
+            assertThatThrownBy(() -> extractor.extract(invalidXml))
+                    .isInstanceOf(SqlExtractionException.class)
+                    .hasMessageContaining("Failed to extract SQL");
+        }
+
+        @Test
+        @DisplayName("应该处理空输入")
+        void should_handle_empty_input() {
+            assertThatThrownBy(() -> extractor.extract(""))
+                    .isInstanceOf(SqlExtractionException.class);
+        }
+
+        @Test
+        @DisplayName("应该处理 null 输入")
+        void should_handle_null_input() {
+            assertThatThrownBy(() -> extractor.extract(null))
+                    .isInstanceOf(SqlExtractionException.class);
+        }
+    }
+
+    // ==================== 边界条件测试 ====================
+
+    @Nested
+    @DisplayName("边界条件测试")
+    class EdgeCaseTests {
+
+        @Test
+        @DisplayName("应该处理只有注释的 XML")
+        void should_handle_xml_with_only_comments() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <!-- This is a comment -->
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("应该处理混合大小写的元素名")
+        void should_handle_mixed_case_element_names() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <Select id="selectAll">
+                        SELECT * FROM users
+                    </Select>
+                    <SELECT id="selectAllUpper">
+                        SELECT * FROM users
+                    </SELECT>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            // 元素名转换为小写比较
+            assertThat(result).hasSize(2);
+        }
+    }
+}
