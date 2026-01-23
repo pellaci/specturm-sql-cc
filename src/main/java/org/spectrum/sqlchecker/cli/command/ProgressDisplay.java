@@ -5,7 +5,7 @@ import org.spectrum.sqlchecker.application.scan.ScanService;
 import org.spectrum.sqlchecker.application.scan.dto.ScanProgress;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
-import org.springframework.stereotype.Component;
+// import org.springframework.stereotype.Component; // 暂时禁用，因为 ScanService 不可用
 
 import java.io.PrintStream;
 import java.time.LocalDateTime;
@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter;
  * @author Spectrum SQL Checker
  * @since 1.0.0
  */
-@Component
+// @Component // 暂时禁用，因为 ScanService 不可用
 @RequiredArgsConstructor
 public class ProgressDisplay {
 

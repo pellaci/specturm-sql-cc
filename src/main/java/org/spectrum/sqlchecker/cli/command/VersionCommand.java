@@ -1,5 +1,6 @@
 package org.spectrum.sqlchecker.cli.command;
 
+import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 
 import java.util.concurrent.Callable;
@@ -10,6 +11,7 @@ import java.util.concurrent.Callable;
  * @author Spectrum SQL Checker
  * @since 1.0.0
  */
+@Component
 @Command(
         name = "version",
         description = "Show version information",

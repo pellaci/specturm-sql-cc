@@ -28,7 +28,7 @@ import java.util.Map;
  * @since 1.0.0
  */
 @Slf4j
-@Service
+// @Service // 暂时禁用，因为 PebbleEngine 配置复杂
 @RequiredArgsConstructor
 public class ReportServiceImpl implements ReportService {
 

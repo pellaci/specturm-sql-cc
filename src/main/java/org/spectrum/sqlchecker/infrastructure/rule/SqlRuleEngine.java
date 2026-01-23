@@ -7,6 +7,7 @@ import net.sf.jsqlparser.statement.Statement;
 import org.spectrum.sqlchecker.domain.rule.RuleConfig;
 import org.spectrum.sqlchecker.domain.rule.RuleContext;
 import org.spectrum.sqlchecker.domain.rule.RuleIssue;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;

@@ -2,7 +2,7 @@ package org.spectrum.sqlchecker.infrastructure.rule;
 
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.statement.Statement;
-import net.sf.jsqlparser.statement.StatementVisitor;
+import net.sf.jsqlparser.statement.StatementVisitorAdapter;
 import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.arithmetic.*;
@@ -19,12 +19,13 @@ import java.util.List;
  * 统一规则访问者
  * <p>
  * 实现 JSqlParser 的各种 Visitor 接口，在遍历 AST 时分发到注册的规则。
+ * 继承 StatementVisitorAdapter 以获得所有抽象方法的默认实现。
  *
  * @author Spectrum SQL Checker
  * @since 2.0.0
  */
 @Slf4j
-public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVisitor, ExpressionVisitor, SelectItemVisitor {
+public class RuleVisitor extends StatementVisitorAdapter implements SelectVisitor, FromItemVisitor, ExpressionVisitor, SelectItemVisitor {
 
     private final RuleContext context;
     private final RuleRegistry registry;
@@ -40,7 +41,7 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     public void visit(Select select) {
         dispatchToRules(select);
         if (select.getSelectBody() != null) {
-            select.getSelectBody().accept(this);
+            select.getSelectBody().accept((SelectVisitor) this);
         }
     }
 
@@ -96,6 +97,26 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     @Override
     public void visit(SetOperationList setOpList) {
         dispatchToRules(setOpList);
+    }
+
+    @Override
+    public void visit(WithItem withItem) {
+        dispatchToRules(withItem);
+    }
+
+    @Override
+    public void visit(ParenthesedSelect parenthesedSelect) {
+        dispatchToRules(parenthesedSelect);
+        // 不要调用 accept，会导致无限循环（ParenthesedSelect.accept 会调用 visit(ParenthesedSelect)）
+        // 只需要遍历内部的 SelectBody
+        if (parenthesedSelect.getSelectBody() != null) {
+            Object selectBody = parenthesedSelect.getSelectBody();
+            if (selectBody instanceof PlainSelect) {
+                visit((PlainSelect) selectBody);
+            } else if (selectBody instanceof SetOperationList) {
+                visit((SetOperationList) selectBody);
+            }
+        }
     }
 
     // ==================== FromItem Visitor 方法 ====================
@@ -164,6 +185,11 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     @Override
     public void visit(Between betweenExpression) {
         dispatchToRules(betweenExpression);
+    }
+
+    @Override
+    public void visit(RangeExpression rangeExpression) {
+        dispatchToRules(rangeExpression);
     }
 
     @Override
@@ -389,6 +415,66 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
         dispatchToRules(jsonAggregateFunction);
     }
 
+    // ==================== 缺失的 ExpressionVisitor 方法 ====================
+
+    public void visit(net.sf.jsqlparser.expression.operators.arithmetic.BitwiseRightShift bitwiseRightShift) {
+        dispatchToRules(bitwiseRightShift);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.operators.arithmetic.BitwiseLeftShift bitwiseLeftShift) {
+        dispatchToRules(bitwiseLeftShift);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.operators.conditional.XorExpression xorExpression) {
+        dispatchToRules(xorExpression);
+        if (xorExpression.getLeftExpression() != null) {
+            xorExpression.getLeftExpression().accept(this);
+        }
+        if (xorExpression.getRightExpression() != null) {
+            xorExpression.getRightExpression().accept(this);
+        }
+    }
+
+    public void visit(net.sf.jsqlparser.expression.operators.relational.FullTextSearch fullTextSearch) {
+        dispatchToRules(fullTextSearch);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.operators.relational.MemberOfExpression memberOfExpression) {
+        dispatchToRules(memberOfExpression);
+    }
+
+    public void visit(net.sf.jsqlparser.schema.Column column) {
+        dispatchToRules(column);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.DateTimeLiteralExpression dateTimeLiteralExpression) {
+        dispatchToRules(dateTimeLiteralExpression);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.VariableAssignment variableAssignment) {
+        dispatchToRules(variableAssignment);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.operators.relational.IsDistinctExpression isDistinctExpression) {
+        dispatchToRules(isDistinctExpression);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.operators.relational.GeometryDistance geometryDistance) {
+        dispatchToRules(geometryDistance);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.TranscodingFunction transcodingFunction) {
+        dispatchToRules(transcodingFunction);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.TrimFunction trimFunction) {
+        dispatchToRules(trimFunction);
+    }
+
+    public void visit(net.sf.jsqlparser.expression.AllValue allValue) {
+        dispatchToRules(allValue);
+    }
+
     @Override
     public void visit(AnalyticExpression analyticExpression) {
         dispatchToRules(analyticExpression);
@@ -445,7 +531,6 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
         dispatchToRules(extractExpression);
     }
 
-    @Override
     public void visit(LateralView lateralView) {
         dispatchToRules(lateralView);
     }
@@ -513,12 +598,10 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
         dispatchToRules(jsonOperator);
     }
 
-    @Override
     public void visit(OrderByClause orderByClause) {
         dispatchToRules(orderByClause);
     }
 
-    @Override
     public void visit(PartitionByClause partitionByClause) {
         dispatchToRules(partitionByClause);
     }
@@ -541,11 +624,6 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     @Override
     public void visit(ConnectByRootOperator connectByRootOperator) {
         dispatchToRules(connectByRootOperator);
-    }
-
-    @Override
-    public void visit(net.sf.jsqlparser.statement.UnsupportedStatement unsupportedStatement) {
-        dispatchToRules(unsupportedStatement);
     }
 
     // ==================== 辅助方法 ====================

@@ -4,6 +4,12 @@ import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
+import org.spectrum.sqlchecker.domain.rule.RuleIssue;
+import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
+import org.spectrum.sqlchecker.infrastructure.rule.SqlRuleEngine;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.stereotype.Component;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -30,6 +36,7 @@ import java.util.stream.Stream;
  * @since 1.0.0
  */
 @Slf4j
+@Component
 @Command(
         name = "scan",
         description = "Scan a codebase for SQL statements",
@@ -45,6 +52,9 @@ public class ScanCommand implements Callable<Integer> {
 
     @Option(names = {"-v", "--verbose"}, description = "Verbose output")
     private boolean verbose;
+
+    @Autowired(required = false)
+    private ApplicationContext applicationContext;
 
     // SQL 匹配模式 - 匹配包含 SQL 关键字的字符串
     private static final Pattern STRING_SQL_PATTERN = Pattern.compile(
@@ -272,13 +282,19 @@ public class ScanCommand implements Callable<Integer> {
             // 使用 JSqlParser 解析 SQL
             Statement stmt = CCJSqlParserUtil.parse(sql);
 
-            // 执行各种检查
-            issues.addAll(checkSelectStar(fileName, sql, stmt));
-            issues.addAll(checkMissingWhere(fileName, sql, stmt));
-            issues.addAll(checkLikeLeadingWildcard(fileName, sql, stmt));
-            issues.addAll(checkOrderByWithoutLimit(fileName, sql, stmt));
-            issues.addAll(checkJoinType(fileName, sql, stmt));
-            issues.addAll(checkSubquery(fileName, sql, stmt));
+            // 优先使用 SqlRuleEngine 进行检查（如果可用）
+            SqlRuleEngine engine = getRuleEngine();
+            if (engine != null) {
+                issues.addAll(checkWithRuleEngine(fileName, sql, engine));
+            } else {
+                // 降级到硬编码检查
+                issues.addAll(checkSelectStar(fileName, sql, stmt));
+                issues.addAll(checkMissingWhere(fileName, sql, stmt));
+                issues.addAll(checkLikeLeadingWildcard(fileName, sql, stmt));
+                issues.addAll(checkOrderByWithoutLimit(fileName, sql, stmt));
+                issues.addAll(checkJoinType(fileName, sql, stmt));
+                issues.addAll(checkSubquery(fileName, sql, stmt));
+            }
 
         } catch (JSQLParserException e) {
             // 解析失败，可能是 SQL 片段或包含占位符
@@ -297,6 +313,67 @@ public class ScanCommand implements Callable<Integer> {
                 }
             }
         }
+    }
+
+    /**
+     * 获取 SqlRuleEngine（从 Spring 容器）
+     */
+    private SqlRuleEngine getRuleEngine() {
+        if (applicationContext != null) {
+            try {
+                return applicationContext.getBean(SqlRuleEngine.class);
+            } catch (Exception e) {
+                if (verbose) {
+                    System.out.println("[DEBUG] Failed to get SqlRuleEngine: " + e.getMessage());
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 使用 SqlRuleEngine 检查 SQL
+     */
+    private List<SqlIssue> checkWithRuleEngine(String fileName, String sql, SqlRuleEngine engine) {
+        List<SqlIssue> issues = new ArrayList<>();
+
+        try {
+            List<RuleIssue> ruleIssues = engine.analyze(fileName + "_sql", sql);
+
+            for (RuleIssue ruleIssue : ruleIssues) {
+                issues.add(convertToSqlIssue(fileName, sql, ruleIssue));
+            }
+
+        } catch (Exception e) {
+            if (verbose) {
+                System.out.println("  [RULE_ENGINE_ERROR] " + e.getMessage());
+            }
+        }
+
+        return issues;
+    }
+
+    /**
+     * 将 RuleIssue 转换为 SqlIssue
+     */
+    private SqlIssue convertToSqlIssue(String fileName, String sql, RuleIssue ruleIssue) {
+        return new SqlIssue(
+                fileName,
+                sql,
+                ruleIssue.getRuleId().toUpperCase().replace("-", "_"),
+                severityToString(ruleIssue.getSeverity()),
+                ruleIssue.getMessage() + (ruleIssue.getSuggestion() != null ? " 💡 " + ruleIssue.getSuggestion() : "")
+        );
+    }
+
+    /**
+     * 将 SeverityLevel 转换为字符串
+     */
+    private String severityToString(SeverityLevel severity) {
+        if (severity == null) {
+            return "WARNING";
+        }
+        return severity.name();
     }
 
     // ========== 检查规则 ==========
