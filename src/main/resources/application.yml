@@ -1,0 +1,79 @@
+spring:
+  application:
+    name: spectrum-sql-checker
+
+  # 数据源配置
+  datasource:
+    url: jdbc:h2:file:./data/sqlchecker;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  # JPA 配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+
+  # SQL 初始化脚本
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+# 应用配置
+spectrum:
+  sqlchecker:
+    # 扫描配置
+    scan:
+      # 默认排除的目录
+      default-excludes:
+        - "**/target/**"
+        - "**/build/**"
+        - "**/.git/**"
+        - "**/node_modules/**"
+        - "**/.idea/**"
+      # 默认包含的文件模式
+      default-includes:
+        - "**/*.java"
+        - "**/*.xml"
+        - "**/*.sql"
+      # 最大并行度
+      max-parallelism: 8
+
+    # 分析配置
+    analysis:
+      # EXPLAIN 超时时间（秒）
+      explain-timeout: 30
+      # 扫描行数阈值
+      rows-threshold: 10000
+
+    # 报告配置
+    report:
+      # 默认输出目录
+      default-output-dir: "./reports"
+      # 主题色（飞书蓝）
+      theme-color: "#3370FF"
+      # 成功色
+      success-color: "#00C675"
+      # 警告色
+      warning-color: "#FF8800"
+      # 错误色
+      error-color: "#F54A45"
+
+    # 数据库配置
+    database:
+      # H2 数据库文件路径
+      h2-file: "./data/sqlchecker"
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    org.spectrum.sqlchecker: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

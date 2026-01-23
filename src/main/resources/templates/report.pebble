@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Checker Report - {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}</title>
+    <style>
+        :root {
+            --primary: #3370FF;
+            --primary-hover: #2966FF;
+            --primary-light: #E1Eaff;
+            --success: #00B628;
+            --warning: #FF8800;
+            --error: #F54A45;
+            --info: #4C5C76;
+            --bg-primary: #FFFFFF;
+            --bg-secondary: #F5F6F7;
+            --border: #DEE0E3;
+            --text-primary: #1F2329;
+            --text-secondary: #646A73;
+            --text-tertiary: #8F959E;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+                'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, #5B8FFF 100%);
+            color: white;
+            padding: 32px 24px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .header-meta {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: -24px auto 32px;
+            padding: 0 24px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .card-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .stat-item {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .stat-item.critical .stat-value { color: var(--error); }
+        .stat-item.warning .stat-value { color: var(--warning); }
+        .stat-item.info .stat-value { color: var(--info); }
+        .stat-item.success .stat-value { color: var(--success); }
+
+        /* Score Badge */
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .score-badge.excellent { background: #E6F4E9; color: var(--success); }
+        .score-badge.good { background: #FFF3E0; color: var(--warning); }
+        .score-badge.poor { background: #FFEBEE; color: var(--error); }
+
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Severity Badge */
+        .severity-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            gap: 6px;
+        }
+
+        .severity-badge.critical {
+            background: #FFEBEE;
+            color: var(--error);
+        }
+
+        .severity-badge.warning {
+            background: #FFF3E0;
+            color: var(--warning);
+        }
+
+        .severity-badge.info {
+            background: #E8F3FF;
+            color: var(--primary);
+        }
+
+        .severity-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .severity-badge.critical .severity-dot { background: var(--error); }
+        .severity-badge.warning .severity-dot { background: var(--warning); }
+        .severity-badge.info .severity-dot { background: var(--primary); }
+
+        /* SQL Code */
+        .sql-code {
+            background: #F8F9FA;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text-primary);
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* Collapsible Section */
+        .collapsible {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .collapsible-header {
+            background: var(--bg-secondary);
+            padding: 14px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .collapsible-header:hover {
+            background: #EEF0F2;
+        }
+
+        .collapsible-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+        }
+
+        .collapsible-icon {
+            transition: transform 0.2s;
+        }
+
+        .collapsible.expanded .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-body {
+            display: none;
+            padding: 16px;
+        }
+
+        .collapsible.expanded .collapsible-body {
+            display: block;
+        }
+
+        /* Location Tags */
+        .location-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            margin: 4px;
+            font-family: monospace;
+        }
+
+        /* Issue List */
+        .issue-list {
+            list-style: none;
+        }
+
+        .issue-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .issue-item:last-child {
+            border-bottom: none;
+        }
+
+        .issue-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+
+        .issue-icon.critical { background: #FFEBEE; color: var(--error); }
+        .issue-icon.warning { background: #FFF3E0; color: var(--warning); }
+        .issue-icon.info { background: #E8F3FF; color: var(--primary); }
+
+        .issue-content {
+            flex: 1;
+        }
+
+        .issue-message {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .issue-suggestion {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Explain Plan */
+        .explain-plan {
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+            background: #F8F9FA;
+            border-radius: var(--radius-md);
+            padding: 16px;
+        }
+
+        .explain-node {
+            padding: 8px 0;
+            padding-left: 20px;
+            border-left: 2px solid var(--border);
+        }
+
+        .explain-node.root {
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .explain-type {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .explain-table {
+            color: var(--warning);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+
+            .card-body {
+                padding: 16px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            thead th, tbody td {
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <h1>🔍 SQL Checker Report</h1>
+            <div class="header-meta">
+                Generated: {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}
+                {% if summary.durationMs > 0 %}
+                • Scan duration: {{ (summary.durationMs / 1000) | numberFormat }}s
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Summary Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-icon" style="background: var(--primary-light);">📊</span>
+                    Scan Summary
+                </div>
+                {% if summary.averageScore >= 80 %}
+                <div class="score-badge excellent">{{ summary.averageScore | numberFormat }}</div>
+                {% elseif summary.averageScore >= 60 %}
+                <div class="score-badge good">{{ summary.averageScore | numberFormat }}</div>
+                {% else %}
+                <div class="score-badge poor">{{ summary.averageScore | numberFormat }}</div>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">{{ summary.totalSql }}</div>
+                        <div class="stat-label">Total SQL</div>
+                    </div>
+                    <div class="stat-item critical">
+                        <div class="stat-value">{{ summary.criticalIssues }}</div>
+                        <div class="stat-label">Critical Issues</div>
+                    </div>
+                    <div class="stat-item warning">
+                        <div class="stat-value">{{ summary.warningIssues }}</div>
+                        <div class="stat-label">Warnings</div>
+                    </div>
+                    <div class="stat-item info">
+                        <div class="stat-value">{{ summary.infoIssues }}</div>
+                        <div class="stat-label">Info</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SQL List -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-icon" style="background: var(--primary-light);">📝</span>
+                    SQL Statements ({{ sqlStatements | length }})
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="filters">
+                    <button class="filter-btn active" onclick="filterBySeverity('all')">All</button>
+                    <button class="filter-btn" onclick="filterBySeverity('critical')">Critical</button>
+                    <button class="filter-btn" onclick="filterBySeverity('warning')">Warning</button>
+                    <button class="filter-btn" onclick="filterBySeverity('info')">Info</button>
+                </div>
+
+                {% if sqlStatements is empty %}
+                <div class="empty-state">
+                    <div class="empty-icon">✓</div>
+                    <p>No SQL statements found</p>
+                </div>
+                {% else %}
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Severity</th>
+                                <th style="width: 80px;">Score</th>
+                                <th>Abstract SQL</th>
+                                <th style="width: 100px;">Locations</th>
+                                <th style="width: 80px;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sql in sqlStatements %}
+                            <tr data-severity="{{ sql.severity | lower }}">
+                                <td>
+                                    <span class="severity-badge {{ sql.severity | lower }}">
+                                        <span class="severity-dot"></span>
+                                        {{ sql.severity }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong>{{ sql.score }}</strong>
+                                </td>
+                                <td>
+                                    <div class="sql-code">{{ sql.abstractSql }}</div>
+                                    {% if sql.originalSql != sql.abstractSql %}
+                                    <details style="margin-top: 8px;">
+                                        <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">View Original SQL</summary>
+                                        <div class="sql-code" style="margin-top: 8px;">{{ sql.originalSql }}</div>
+                                    </details>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% for location in sql.locations %}
+                                    <span class="location-tag">{{ location.fileName }}:{{ location.startLine }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <button class="filter-btn" onclick="toggleDetails('{{ sql.id }}')">View</button>
+                                </td>
+                            </tr>
+
+                            <!-- Details Row (Hidden by default) -->
+                            <tr id="details-{{ sql.id }}" style="display: none;">
+                                <td colspan="5" style="padding: 0;">
+                                    <div style="padding: 20px; background: var(--bg-secondary);">
+                                        <!-- Static Analysis -->
+                                        {% if sql.staticAnalysis %}
+                                        <h4 style="margin-bottom: 12px;">📋 Static Analysis</h4>
+                                        {% if sql.staticAnalysis.issues is not empty %}
+                                        <ul class="issue-list">
+                                            {% for issue in sql.staticAnalysis.issues %}
+                                            <li class="issue-item">
+                                                <span class="issue-icon {{ issue.severity | lower }}">!</span>
+                                                <div class="issue-content">
+                                                    <div class="issue-message">{{ issue.message }}</div>
+                                                    {% if issue.suggestion %}
+                                                    <div class="issue-suggestion">💡 {{ issue.suggestion }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}
+                                        <p style="color: var(--text-secondary);">No static issues found.</p>
+                                        {% endif %}
+                                        {% endif %}
+
+                                        <!-- EXPLAIN Analysis -->
+                                        {% if sql.explainAnalysis %}
+                                        <h4 style="margin: 20px 0 12px;">📊 EXPLAIN Analysis</h4>
+                                        {% if sql.explainAnalysis.plan %}
+                                        <div class="explain-plan">
+                                            {% for node in sql.explainAnalysis.plan.nodes %}
+                                            <div class="explain-node {{ node.id == '1' ? 'root' : '' }}">
+                                                <span class="explain-type">{{ node.selectType }}</span>
+                                                <span> | </span>
+                                                <span class="explain-type">{{ node.type }}</span>
+                                                <span> | </span>
+                                                <span class="explain-table">{{ node.table }}</span>
+                                                {% if node.key %}
+                                                <span> | Key: {{ node.key }}</span>
+                                                {% endif %}
+                                                {% if node.rows %}
+                                                <span> | Rows: {{ node.rows }}</span>
+                                                {% endif %}
+                                                {% if node.extra %}
+                                                <div style="color: var(--text-secondary); margin-top: 4px;">{{ node.extra }}</div>
+                                                {% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        {% if sql.explainAnalysis.issues is not empty %}
+                                        <ul class="issue-list" style="margin-top: 12px;">
+                                            {% for issue in sql.explainAnalysis.issues %}
+                                            <li class="issue-item">
+                                                <span class="issue-icon {{ issue.severity | lower }}">!</span>
+                                                <div class="issue-content">
+                                                    <div class="issue-message">{{ issue.message }}</div>
+                                                    {% if issue.suggestion %}
+                                                    <div class="issue-suggestion">💡 {{ issue.suggestion }}</div>
+                                                    {% endif %}
+                                                </div>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                        {% endif %}
+
+                                        <!-- Expert Analysis -->
+                                        {% if sql.expertAnalysis %}
+                                        <h4 style="margin: 20px 0 12px;">🎯 Expert Recommendations</h4>
+                                        {% if sql.expertAnalysis.recommendations is not empty %}
+                                        <ul class="issue-list">
+                                            {% for rec in sql.expertAnalysis.recommendations %}
+                                            <li class="issue-item">
+                                                <span class="issue-icon info">★</span>
+                                                <div class="issue-content">
+                                                    <div class="issue-message">{{ rec.title }}</div>
+                                                    <div style="font-size: 13px; color: var(--text-secondary); margin: 4px 0;">{{ rec.description }}</div>
+                                                    <div class="issue-suggestion">💡 {{ rec.suggestion }}</div>
+                                                    {% if rec.expectedBenefit %}
+                                                    <div style="font-size: 12px; color: var(--success); margin-top: 4px;">
+                                                        ✓ {{ rec.expectedBenefit }}
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% else %}
+                                        <p style="color: var(--text-secondary);">No recommendations.</p>
+                                        {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>Generated by <strong>SQL Checker</strong> v1.0.0</p>
+        <p style="margin-top: 4px;">Scan time: {{ (summary.durationMs / 1000) | numberFormat }}s</p>
+    </div>
+
+    <script>
+        // Toggle details
+        function toggleDetails(id) {
+            const row = document.getElementById('details-' + id);
+            if (row.style.display === 'none') {
+                row.style.display = 'table-row';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+
+        // Filter by severity
+        function filterBySeverity(severity) {
+            const rows = document.querySelectorAll('tbody tr[data-severity]');
+            const buttons = document.querySelectorAll('.filter-btn');
+
+            // Update button states
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Filter rows
+            rows.forEach(row => {
+                if (severity === 'all' || row.dataset.severity === severity) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Collapsible sections
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            header.addEventListener('click', () => {
+                header.parentElement.classList.toggle('expanded');
+            });
+        });
+    </script>
+</body>
+</html>

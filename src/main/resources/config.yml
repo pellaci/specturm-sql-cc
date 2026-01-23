@@ -1,0 +1,90 @@
+# Spectrum SQL Checker 配置文件
+# 首次运行后，此文件将被自动生成和更新
+
+# 数据库连接配置
+database:
+  # 默认连接 ID
+  default-connection: "default"
+
+  # 连接列表
+  connections:
+    - id: "default"
+      name: "本地 MySQL"
+      type: "mysql"
+      host: "localhost"
+      port: 3306
+      database: "test_db"
+      username: "root"
+      # 密码将在运行时加密存储
+
+# 扫描配置
+scan:
+  # 默认扫描范围
+  default-scope: "full"
+
+  # 排除的目录
+  excludes:
+    - "**/target/**"
+    - "**/build/**"
+    - "**/.git/**"
+    - "**/node_modules/**"
+    - "**/.idea/**"
+    - "**/.vscode/**"
+
+  # 包含的文件模式
+  includes:
+    - "**/*.java"
+    - "**/*.xml"
+    - "**/*.sql"
+
+# 分析配置
+analysis:
+  # 启用的规则
+  enabled-rules:
+    static:
+      - "SELECT_STAR"
+      - "SELECT_WITHOUT_WHERE"
+      - "MISSING_INDEX"
+      - "SQL_INJECTION_RISK"
+      - "LIKE_LEADING_WILDCARD"
+    explain:
+      - "FULL_TABLE_SCAN"
+      - "NO_INDEX_USED"
+      - "HIGH_SCAN_ROWS"
+      - "USING_TEMPORARY"
+      - "USING_FILESORT"
+    expert:
+      - "INDEX_OPTIMIZATION"
+      - "QUERY_OPTIMIZATION"
+      - "JOIN_OPTIMIZATION"
+
+  # 阈值配置
+  thresholds:
+    # EXPLAIN 扫描行数阈值
+    scan-rows: 10000
+    # EXPLAIN 超时时间（秒）
+    explain-timeout: 30
+    # 表连接数量警告阈值
+    max-joins: 5
+
+# 报告配置
+report:
+  # 输出目录
+  output-dir: "./reports"
+
+  # 报告标题
+  title: "SQL 质量检测报告"
+
+  # 飞书 UI 主题配置
+  theme:
+    primary-color: "#3370FF"
+    success-color: "#00C675"
+    warning-color: "#FF8800"
+    error-color: "#F54A45"
+    text-color: "#1F2329"
+    border-color: "#DEE0E3"
+    background-color: "#FFFFFF"
+    background-secondary: "#F5F6F7"
+
+  # 是否自动打开报告
+  auto-open: true
