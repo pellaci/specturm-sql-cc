@@ -105,4 +105,13 @@ public class RuleContext {
     public int getIssueCount() {
         return issues.size();
     }
+
+    /**
+     * 设置解析后的 Statement
+     *
+     * @param statement Statement 对象
+     */
+    public void setStatement(Statement statement) {
+        this.statement = statement;
+    }
 }

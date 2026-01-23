@@ -110,7 +110,7 @@ public class SqlRuleEngine {
 
         Map<String, List<RuleIssue>> results = new ConcurrentHashMap<>();
 
-        sqls.parallelStream().forEach(entry -> {
+        sqls.entrySet().parallelStream().forEach(entry -> {
             String sqlId = entry.getKey();
             String sql = entry.getValue();
             results.put(sqlId, analyze(sqlId, sql));

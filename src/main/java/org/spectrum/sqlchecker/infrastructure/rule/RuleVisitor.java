@@ -419,22 +419,18 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
         dispatchToRules(keepExpression);
     }
 
-    @Override
     public void visit(Limit limit) {
         dispatchToRules(limit);
     }
 
-    @Override
     public void visit(Offset offset) {
         dispatchToRules(offset);
     }
 
-    @Override
     public void visit(Fetch fetch) {
         dispatchToRules(fetch);
     }
 
-    @Override
     public void visit(RowConstructor rowConstructor) {
         dispatchToRules(rowConstructor);
     }
@@ -459,12 +455,10 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
         dispatchToRules(values);
     }
 
-    @Override
     public void visit(First first) {
         dispatchToRules(first);
     }
 
-    @Override
     public void visit(SimilarToExpression similarToExpression) {
         dispatchToRules(similarToExpression);
     }
@@ -547,6 +541,11 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     @Override
     public void visit(ConnectByRootOperator connectByRootOperator) {
         dispatchToRules(connectByRootOperator);
+    }
+
+    @Override
+    public void visit(net.sf.jsqlparser.statement.UnsupportedStatement unsupportedStatement) {
+        dispatchToRules(unsupportedStatement);
     }
 
     // ==================== 辅助方法 ====================
