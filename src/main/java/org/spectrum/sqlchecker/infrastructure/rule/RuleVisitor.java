@@ -187,11 +187,8 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     }
 
     @Override
-    public void visit(SelectExpressionItem selectExpressionItem) {
-        dispatchToRules(selectExpressionItem);
-        if (selectExpressionItem.getExpression() != null) {
-            selectExpressionItem.getExpression().accept(this);
-        }
+    public void visit(SelectItem selectItem) {
+        dispatchToRules(selectItem);
     }
 
     @Override
@@ -520,11 +517,6 @@ public class RuleVisitor implements StatementVisitor, SelectVisitor, FromItemVis
     @Override
     public void visit(JsonOperator jsonOperator) {
         dispatchToRules(jsonOperator);
-    }
-
-    @Override
-    public void visit(WithinGroupExpression withinGroupExpression) {
-        dispatchToRules(withinGroupExpression);
     }
 
     @Override

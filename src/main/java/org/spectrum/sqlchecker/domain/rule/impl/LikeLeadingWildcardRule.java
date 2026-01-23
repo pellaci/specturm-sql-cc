@@ -2,8 +2,8 @@ package org.spectrum.sqlchecker.domain.rule.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.expression.LikeExpression;
 import net.sf.jsqlparser.expression.StringValue;
+import net.sf.jsqlparser.expression.operators.relational.LikeExpression;
 import org.spectrum.sqlchecker.domain.rule.RuleContext;
 import org.spectrum.sqlchecker.domain.rule.RuleIssue;
 import org.spectrum.sqlchecker.domain.rule.RuleLocation;
