@@ -9,6 +9,8 @@ import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
 import org.spectrum.sqlchecker.application.scan.dto.SqlLocationDto;
 import org.spectrum.sqlchecker.application.scan.dto.SqlStatementDto;
 import org.spectrum.sqlchecker.domain.shared.exception.ScanException;
+import org.spectrum.sqlchecker.domain.shared.util.LabelMapper;
+import org.spectrum.sqlchecker.domain.shared.util.ScorePolicy;
 import org.spectrum.sqlchecker.infrastructure.template.TemplateEngine;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +27,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -40,44 +41,6 @@ import java.util.Map;
 public class ReportServiceImpl implements ReportService {
 
     private final TemplateEngine templateEngine;
-    private static final Map<String, String> LABELS = Map.ofEntries(
-            Map.entry("MYBATIS_XML_STATIC", "MyBatis XML 静态"),
-            Map.entry("MYBATIS_XML_DYNAMIC", "MyBatis XML 动态"),
-            Map.entry("MYBATIS_ANNOTATION", "MyBatis 注解"),
-            Map.entry("JPA_NATIVE_QUERY", "JPA 原生查询"),
-            Map.entry("STRING_CONCAT", "字符串拼接"),
-            Map.entry("PLACEHOLDER_TEMPLATE", "占位符模板"),
-            Map.entry("UNKNOWN", "未知"),
-            Map.entry("VALID", "合法"),
-            Map.entry("INVALID", "非法"),
-            Map.entry("SUPPORTED", "可执行"),
-            Map.entry("NOT_SUPPORTED", "不支持"),
-            Map.entry("SKIPPED", "已跳过"),
-            Map.entry("JAVA", "Java"),
-            Map.entry("JAVASCRIPT", "JavaScript/TypeScript"),
-            Map.entry("MYBATIS", "MyBatis XML"),
-            Map.entry("JPA_ANNOTATION", "JPA 注解"),
-            Map.entry("STRING_LITERAL", "字符串拼接"),
-            Map.entry("SQL_FILE", "SQL 文件"),
-            Map.entry("SELECT_STAR", "SELECT *"),
-            Map.entry("SELECT_WITHOUT_WHERE", "SELECT 无 WHERE"),
-            Map.entry("MISSING_INDEX", "缺失索引"),
-            Map.entry("IMPLICIT_TYPE_CONVERSION", "隐式类型转换"),
-            Map.entry("SUSPICIOUS_JOIN_ORDER", "可疑 JOIN 顺序"),
-            Map.entry("CROSS_JOIN", "隐式/CROSS JOIN"),
-            Map.entry("SUBQUERY_IN_SELECT", "SELECT 中子查询"),
-            Map.entry("UNCORRELATED_SUBQUERY", "非相关子查询"),
-            Map.entry("POTENTIAL_N_PLUS_ONE", "潜在 N+1"),
-            Map.entry("SQL_INJECTION_RISK", "SQL 注入风险"),
-            Map.entry("DYNAMIC_SQL", "动态 SQL"),
-            Map.entry("TOO_MANY_JOINS", "过多 JOIN"),
-            Map.entry("LIKE_LEADING_WILDCARD", "前置通配符 LIKE"),
-            Map.entry("FULL_TABLE_SCAN", "全表扫描"),
-            Map.entry("NO_INDEX_USED", "未使用索引"),
-            Map.entry("HIGH_ROWS", "扫描行数过多"),
-            Map.entry("USING_TEMPORARY", "使用临时表"),
-            Map.entry("USING_FILESORT", "使用文件排序")
-    );
 
     @Override
     public void generateHtmlReport(ScanResult scanResult, String outputPath) throws ScanException {
@@ -150,19 +113,19 @@ public class ReportServiceImpl implements ReportService {
             }
 
                 if (sql.getCategory() != null) {
-                    increment(categoryCounts, formatLabel(sql.getCategory().name()));
+                    increment(categoryCounts, LabelMapper.format(sql.getCategory().name()));
                 } else {
                     increment(categoryCounts, "Unknown");
                 }
 
                 if (sql.getValidity() != null) {
-                    increment(validityCounts, formatLabel(sql.getValidity().name()));
+                    increment(validityCounts, LabelMapper.format(sql.getValidity().name()));
                 } else {
                     increment(validityCounts, "Unknown");
                 }
 
                 if (sql.getExplainEligibility() != null) {
-                    increment(explainEligibilityCounts, formatLabel(sql.getExplainEligibility().name()));
+                    increment(explainEligibilityCounts, LabelMapper.format(sql.getExplainEligibility().name()));
                     if (sql.getExplainEligibility().name().equals("SUPPORTED")) {
                         explainEligible++;
                         if (sql.getExplainAnalysis() != null && sql.getExplainAnalysis().getPlan() != null) {
@@ -176,7 +139,7 @@ public class ReportServiceImpl implements ReportService {
                 if (sql.getLocations() != null && !sql.getLocations().isEmpty()) {
                     SqlLocationDto location = sql.getLocations().get(0);
                     if (location.getSourceType() != null) {
-                        increment(sourceTypeCounts, formatLabel(location.getSourceType().name()));
+                        increment(sourceTypeCounts, LabelMapper.format(location.getSourceType().name()));
                     } else {
                         increment(sourceTypeCounts, "Unknown");
                     }
@@ -188,7 +151,7 @@ public class ReportServiceImpl implements ReportService {
                     sql.getStaticAnalysis().getIssues()
                             .forEach(issue -> {
                                 if (issue.getType() != null) {
-                                    increment(staticIssueCounts, formatLabel(issue.getType().name()));
+                                    increment(staticIssueCounts, LabelMapper.format(issue.getType().name()));
                                 } else {
                                     increment(staticIssueCounts, "Unknown");
                                 }
@@ -199,7 +162,7 @@ public class ReportServiceImpl implements ReportService {
                     sql.getExplainAnalysis().getIssues()
                             .forEach(issue -> {
                                 if (issue.getType() != null) {
-                                    increment(explainIssueCounts, formatLabel(issue.getType()));
+                                    increment(explainIssueCounts, LabelMapper.format(issue.getType()));
                                 } else {
                                     increment(explainIssueCounts, "Unknown");
                                 }
@@ -216,9 +179,18 @@ public class ReportServiceImpl implements ReportService {
 
         int staticIssueTotal = sumCounts(staticIssueCounts);
         int explainIssueTotal = sumCounts(explainIssueCounts);
+        int totalFiles = scanResult.getTotalFiles() > 0 ? scanResult.getTotalFiles() : scanResult.getFilesScanned();
+        String scanPath = scanResult.getScanPath();
+        String projectName = resolveProjectName(scanPath);
 
         return ReportSummary.builder()
                 .totalSql(totalSql)
+                .scanPath(scanPath)
+                .projectName(projectName)
+                .totalFiles(totalFiles)
+                .javaFiles(scanResult.getJavaFiles())
+                .xmlFiles(scanResult.getXmlFiles())
+                .sqlFiles(scanResult.getSqlFiles())
                 .parsedSql(parsedSql)
                 .totalIssues(criticalIssues + warningIssues + infoIssues)
                 .criticalIssues(criticalIssues)
@@ -230,44 +202,21 @@ public class ReportServiceImpl implements ReportService {
                 .explainExecuted(explainExecuted)
                 .explainCoverage(explainCoverage)
                 .averageScore(avgScore)
+                .scoreFormula(ScorePolicy.formulaDescription())
                 .categoryStats(toStatList(categoryCounts, parsedSql))
                 .validityStats(toStatList(validityCounts, parsedSql))
                 .explainEligibilityStats(toStatList(explainEligibilityCounts, parsedSql))
                 .sourceTypeStats(toStatList(sourceTypeCounts, parsedSql))
                 .staticIssueStats(toStatList(staticIssueCounts, staticIssueTotal))
                 .explainIssueStats(toStatList(explainIssueCounts, explainIssueTotal))
+                .staticIssueTotal(staticIssueTotal)
+                .explainIssueTotal(explainIssueTotal)
                 .generatedAt(Instant.now())
                 .build();
     }
 
     private void increment(Map<String, Integer> counts, String key) {
         counts.put(key, counts.getOrDefault(key, 0) + 1);
-    }
-
-    private String formatLabel(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return "未知";
-        }
-        String normalized = raw.trim();
-        String mapped = LABELS.get(normalized);
-        if (mapped != null) {
-            return mapped;
-        }
-        String[] parts = raw.toLowerCase(Locale.ROOT).split("_");
-        StringBuilder sb = new StringBuilder();
-        for (String part : parts) {
-            if (part.isBlank()) {
-                continue;
-            }
-            if (sb.length() > 0) {
-                sb.append(' ');
-            }
-            sb.append(Character.toUpperCase(part.charAt(0)));
-            if (part.length() > 1) {
-                sb.append(part.substring(1));
-            }
-        }
-        return sb.toString();
     }
 
     private List<ReportStatItem> toStatList(Map<String, Integer> counts, int total) {
@@ -298,6 +247,18 @@ public class ReportServiceImpl implements ReportService {
             total += value;
         }
         return total;
+    }
+
+    private String resolveProjectName(String scanPath) {
+        if (scanPath == null || scanPath.isBlank()) {
+            return "未命名项目";
+        }
+        String normalized = scanPath.replace("\\", "/");
+        int idx = normalized.lastIndexOf('/');
+        if (idx >= 0 && idx < normalized.length() - 1) {
+            return normalized.substring(idx + 1);
+        }
+        return normalized;
     }
 
     @Override

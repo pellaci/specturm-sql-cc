@@ -24,6 +24,8 @@ import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SqlCategory;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SqlSourceType;
 import org.spectrum.sqlchecker.domain.shared.enumeration.ValidityStatus;
+import org.spectrum.sqlchecker.domain.shared.util.LabelMapper;
+import org.spectrum.sqlchecker.domain.shared.util.ScorePolicy;
 import org.spectrum.sqlchecker.infrastructure.database.ConnectionManager;
 import org.spectrum.sqlchecker.infrastructure.extractor.MyBatisSqlExtractor;
 import org.spectrum.sqlchecker.infrastructure.rule.SqlRuleEngine;
@@ -595,19 +597,16 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
             String sqlId = entry.getId() != null ? entry.getId() : UUID.randomUUID().toString();
 
             SeverityLevel highestSeverity = SeverityLevel.INFO;
-            int lowestScore = 100;
 
             for (ScanIssue issue : sqlIssues) {
                 if ("CRITICAL".equals(issue.getSeverity())) {
                     highestSeverity = SeverityLevel.CRITICAL;
-                    lowestScore = Math.min(lowestScore, 40);
                 } else if ("WARNING".equals(issue.getSeverity()) && highestSeverity != SeverityLevel.CRITICAL) {
                     highestSeverity = SeverityLevel.WARNING;
-                    lowestScore = Math.min(lowestScore, 60);
-                } else if (!sqlIssues.isEmpty()) {
-                    lowestScore = Math.min(lowestScore, 80);
                 }
             }
+
+            ScoreDetail scoreDetail = calculateScoreDetail(sqlIssues);
 
             List<StaticIssue> staticIssues = new ArrayList<>();
             for (ScanIssue issue : sqlIssues) {
@@ -636,7 +635,7 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                     .sqlId(sqlId)
                     .severity(highestSeverity)
                     .issues(staticIssues)
-                    .score(lowestScore)
+                    .score(scoreDetail.score)
                     .build();
 
             PreprocessResult preprocess = entry.getPreprocessResult();
@@ -657,7 +656,8 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                     .staticAnalysis(staticAnalysis)
                     .explainAnalysis(entry.getExplainAnalysis())
                     .severity(highestSeverity)
-                    .score(lowestScore)
+                    .score(scoreDetail.score)
+                    .scoreExplanation(scoreDetail.explanation)
                     .build();
 
             sqlStatements.add(dto);
@@ -667,6 +667,11 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                 .scanId(UUID.randomUUID().toString())
                 .status(org.spectrum.sqlchecker.domain.shared.enumeration.ScanStatus.COMPLETED)
                 .filesScanned(context.totalFiles)
+                .scanPath(context.path)
+                .totalFiles(context.totalFiles)
+                .javaFiles(context.javaFiles)
+                .xmlFiles(context.xmlFiles)
+                .sqlFiles(context.sqlFiles)
                 .sqlFound(context.sqlFound)
                 .uniqueSqlFound(context.sqlParsed)
                 .durationMs(context.durationMs)
@@ -705,6 +710,96 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
 
     private String truncate(String s, int max) {
         return s.length() <= max ? s : s.substring(0, max) + "...";
+    }
+
+    private ScoreDetail calculateScoreDetail(List<ScanIssue> issues) {
+        int criticalCount = 0;
+        int warningCount = 0;
+        int infoCount = 0;
+        Map<String, Integer> typeCounts = new LinkedHashMap<>();
+
+        for (ScanIssue issue : issues) {
+            String severity = normalizeSeverity(issue.getSeverity());
+            switch (severity) {
+                case "CRITICAL" -> criticalCount++;
+                case "WARNING" -> warningCount++;
+                default -> infoCount++;
+            }
+
+            String type = issue.getType() != null && !issue.getType().isBlank()
+                    ? issue.getType().trim().toUpperCase(Locale.ROOT)
+                    : "UNKNOWN";
+            typeCounts.put(type, typeCounts.getOrDefault(type, 0) + 1);
+        }
+
+        int deduction = criticalCount * ScorePolicy.CRITICAL_DEDUCTION
+                + warningCount * ScorePolicy.WARNING_DEDUCTION
+                + infoCount * ScorePolicy.INFO_DEDUCTION;
+        int score = Math.max(0, ScorePolicy.BASE_SCORE - deduction);
+
+        String explanation = buildScoreExplanation(criticalCount, warningCount, infoCount, typeCounts, deduction, score);
+        return new ScoreDetail(score, explanation);
+    }
+
+    private String normalizeSeverity(String severity) {
+        if (severity == null || severity.isBlank()) {
+            return "INFO";
+        }
+        String normalized = severity.trim().toUpperCase(Locale.ROOT);
+        if ("CRITICAL".equals(normalized) || "WARNING".equals(normalized)) {
+            return normalized;
+        }
+        return "INFO";
+    }
+
+    private String buildScoreExplanation(int criticalCount, int warningCount, int infoCount,
+                                         Map<String, Integer> typeCounts, int deduction, int score) {
+        List<String> segments = new ArrayList<>();
+        segments.add("基础分 " + ScorePolicy.BASE_SCORE);
+
+        int totalIssues = criticalCount + warningCount + infoCount;
+        if (totalIssues == 0) {
+            segments.add("未触发规则");
+            segments.add("最终得分 " + score);
+            return String.join("；", segments);
+        }
+
+        if (criticalCount > 0) {
+            segments.add("严重 " + criticalCount + "x" + ScorePolicy.CRITICAL_DEDUCTION
+                    + "=-" + (criticalCount * ScorePolicy.CRITICAL_DEDUCTION));
+        }
+        if (warningCount > 0) {
+            segments.add("警告 " + warningCount + "x" + ScorePolicy.WARNING_DEDUCTION
+                    + "=-" + (warningCount * ScorePolicy.WARNING_DEDUCTION));
+        }
+        if (infoCount > 0) {
+            segments.add("提示 " + infoCount + "x" + ScorePolicy.INFO_DEDUCTION
+                    + "=-" + (infoCount * ScorePolicy.INFO_DEDUCTION));
+        }
+
+        if (typeCounts != null && !typeCounts.isEmpty()) {
+            List<String> rules = new ArrayList<>();
+            for (Map.Entry<String, Integer> entry : typeCounts.entrySet()) {
+                String label = LabelMapper.format(entry.getKey());
+                int count = entry.getValue();
+                rules.add(label + (count > 1 ? "x" + count : ""));
+            }
+            segments.add("规则 " + String.join(", ", rules));
+        }
+
+        segments.add("总扣分 " + deduction);
+        segments.add("最终得分 " + score);
+        return String.join("；", segments);
+    }
+
+    private static class ScoreDetail {
+        private final int score;
+        private final String explanation;
+
+        private ScoreDetail(int score, String explanation) {
+            this.score = score;
+            this.explanation = explanation;
+        }
     }
 
     private static class ScanContext {

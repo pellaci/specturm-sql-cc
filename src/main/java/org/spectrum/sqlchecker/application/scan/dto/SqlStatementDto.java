@@ -111,4 +111,9 @@ public class SqlStatementDto {
      * 总体得分
      */
     private Integer score;
+
+    /**
+     * 得分说明
+     */
+    private String scoreExplanation;
 }

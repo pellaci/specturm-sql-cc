@@ -26,6 +26,36 @@ public class ReportSummary {
     private int totalSql;
 
     /**
+     * 扫描路径
+     */
+    private String scanPath;
+
+    /**
+     * 项目名称
+     */
+    private String projectName;
+
+    /**
+     * 扫描的文件总数
+     */
+    private int totalFiles;
+
+    /**
+     * Java 文件数量
+     */
+    private int javaFiles;
+
+    /**
+     * XML 文件数量
+     */
+    private int xmlFiles;
+
+    /**
+     * SQL 文件数量
+     */
+    private int sqlFiles;
+
+    /**
      * 解析成功的 SQL 数量
      */
     private int parsedSql;
@@ -81,6 +111,11 @@ public class ReportSummary {
     private double averageScore;
 
     /**
+     * 得分计算说明
+     */
+    private String scoreFormula;
+
+    /**
      * SQL 分类统计
      */
     private List<ReportStatItem> categoryStats;
@@ -109,6 +144,16 @@ public class ReportSummary {
      * EXPLAIN 问题类型统计
      */
     private List<ReportStatItem> explainIssueStats;
+
+    /**
+     * 静态问题总量
+     */
+    private int staticIssueTotal;
+
+    /**
+     * EXPLAIN 问题总量
+     */
+    private int explainIssueTotal;
 
     /**
      * 生成时间

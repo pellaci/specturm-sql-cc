@@ -37,6 +37,31 @@ public class ScanResult {
     private int filesScanned;
 
     /**
+     * 扫描路径
+     */
+    private String scanPath;
+
+    /**
+     * 扫描的文件总数
+     */
+    private int totalFiles;
+
+    /**
+     * Java 文件数量
+     */
+    private int javaFiles;
+
+    /**
+     * XML 文件数量
+     */
+    private int xmlFiles;
+
+    /**
+     * SQL 文件数量
+     */
+    private int sqlFiles;
+
+    /**
      * 发现的 SQL 数量
      */
     private int sqlFound;

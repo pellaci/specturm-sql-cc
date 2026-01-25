@@ -6,25 +6,55 @@
     <title>SQL 检查报告 - {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}</title>
     <style>
         :root {
-            --primary: #3370FF;
-            --primary-hover: #2966FF;
-            --primary-light: #E1Eaff;
-            --success: #00B628;
-            --warning: #FF8800;
-            --error: #F54A45;
-            --info: #4C5C76;
+            /* 光谱色系 - Spectrum Colors */
+            --spectrum-red: #FF4D4F;
+            --spectrum-orange: #FF7A45;
+            --spectrum-yellow: #FFC53D;
+            --spectrum-green: #52C41A;
+            --spectrum-blue: #1890FF;
+            --spectrum-indigo: #597EF7;
+            --spectrum-violet: #722ED1;
+
+            /* 语义色彩 - 基于光谱 */
+            --primary: #1890FF;
+            --primary-hover: #40A9FF;
+            --primary-light: #E6F7FF;
+            --success: #52C41A;
+            --warning: #FF7A45;
+            --error: #FF4D4F;
+            --info: #597EF7;
+
+            /* 背景色 */
             --bg-primary: #FFFFFF;
-            --bg-secondary: #F5F6F7;
-            --border: #DEE0E3;
-            --text-primary: #1F2329;
-            --text-secondary: #646A73;
-            --text-tertiary: #8F959E;
-            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --bg-secondary: #F6F8FA;
+            --bg-dark: #0D1117;
+            --border: #D0D7DE;
+
+            /* 文字色 */
+            --text-primary: #24292F;
+            --text-secondary: #57606A;
+            --text-tertiary: #8B949E;
+
+            /* 阴影 */
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
             --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
             --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+
+            /* 圆角 */
             --radius-sm: 4px;
             --radius-md: 8px;
             --radius-lg: 12px;
+
+            /* 光谱渐变 */
+            --spectrum-gradient: linear-gradient(90deg,
+                #FF4D4F 0%,
+                #FF7A45 17%,
+                #FFC53D 33%,
+                #52C41A 50%,
+                #1890FF 67%,
+                #597EF7 83%,
+                #722ED1 100%
+            );
         }
 
         * {
@@ -44,32 +74,67 @@
 
         /* Header */
         .header {
-            background: linear-gradient(135deg, var(--primary) 0%, #5B8FFF 100%);
-            color: white;
-            padding: 32px 24px;
-            box-shadow: var(--shadow-md);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 0;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header::before {
+            content: '';
+            display: block;
+            height: 3px;
+            background: var(--spectrum-gradient);
         }
 
         .header-content {
             max-width: 1400px;
             margin: 0 auto;
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-dark);
+            border-radius: var(--radius-md);
+            padding: 6px;
         }
 
         .header h1 {
-            font-size: 28px;
+            font-size: 20px;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 2px;
+            background: var(--spectrum-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
         }
 
         .header-meta {
-            opacity: 0.9;
-            font-size: 14px;
+            margin-left: auto;
+            text-align: right;
+            font-size: 12px;
+            color: var(--text-secondary);
         }
 
         /* Main Container */
         .container {
             max-width: 1400px;
-            margin: -24px auto 32px;
+            margin: 24px auto 32px;
             padding: 0 24px;
         }
 
@@ -80,33 +145,47 @@
             box-shadow: var(--shadow-sm);
             margin-bottom: 24px;
             overflow: hidden;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--spectrum-gradient);
+            opacity: 0.8;
         }
 
         .card-header {
-            padding: 20px 24px;
+            padding: 16px 24px;
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            background: var(--bg-secondary);
         }
 
         .card-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .card-icon {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
             border-radius: var(--radius-sm);
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .card-body {
@@ -148,13 +227,21 @@
         }
 
         .kpi-card {
-            background: var(--bg-secondary);
+            background: var(--bg-primary);
             border-radius: var(--radius-md);
             padding: 14px 16px;
             display: flex;
             flex-direction: column;
             gap: 6px;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--spectrum-blue);
         }
+
+        .kpi-card:nth-child(1) { border-left-color: var(--spectrum-blue); }
+        .kpi-card:nth-child(2) { border-left-color: var(--spectrum-green); }
+        .kpi-card:nth-child(3) { border-left-color: var(--spectrum-indigo); }
+        .kpi-card:nth-child(4) { border-left-color: var(--spectrum-violet); }
+        .kpi-card:nth-child(5) { border-left-color: var(--spectrum-orange); }
 
         .kpi-value {
             font-size: 22px;
@@ -297,15 +384,129 @@
             border-radius: 50%;
             font-size: 28px;
             font-weight: 700;
+            box-shadow: var(--shadow-sm);
         }
 
-        .score-badge.excellent { background: #E6F4E9; color: var(--success); }
-        .score-badge.good { background: #FFF3E0; color: var(--warning); }
-        .score-badge.poor { background: #FFEBEE; color: var(--error); }
+        .score-badge.excellent {
+            background: linear-gradient(135deg, #F6FFED 0%, #D9F7BE 100%);
+            color: var(--spectrum-green);
+            border: 2px solid #B7EB8F;
+        }
+        .score-badge.good {
+            background: linear-gradient(135deg, #FFF7E6 0%, #FFE7BA 100%);
+            color: var(--spectrum-orange);
+            border: 2px solid #FFD591;
+        }
+        .score-badge.poor {
+            background: linear-gradient(135deg, #FFF1F0 0%, #FFCCC7 100%);
+            color: var(--spectrum-red);
+            border: 2px solid #FFA39E;
+        }
+
+        .scan-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+
+        .scan-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .scan-meta-label {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .scan-meta-value {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .scan-meta-sub {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .scan-meta-path .scan-meta-value {
+            max-width: 360px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+            vertical-align: bottom;
+        }
+
+        .has-tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .has-tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 10px);
+            transform: translateX(-50%);
+            background: #1F2A37;
+            color: #FFFFFF;
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            line-height: 1.35;
+            white-space: normal;
+            min-width: 180px;
+            max-width: 320px;
+            word-break: break-word;
+            text-align: left;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            z-index: 10;
+        }
+
+        .has-tooltip::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 4px);
+            transform: translateX(-50%);
+            border-width: 6px 6px 0 6px;
+            border-style: solid;
+            border-color: #1F2A37 transparent transparent transparent;
+            opacity: 0;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            z-index: 10;
+        }
+
+        .has-tooltip:hover::after,
+        .has-tooltip:hover::before {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-2px);
+        }
+
+        .has-tooltip[data-tooltip=""]::after,
+        .has-tooltip[data-tooltip=""]::before {
+            display: none;
+        }
 
         /* Table */
         .table-container {
             overflow-x: auto;
+            max-height: 800px;
+            overflow-y: auto;
+            position: relative;
         }
 
         table {
@@ -314,17 +515,15 @@
         }
 
         thead th {
+            position: sticky;
+            top: 0;
             background: var(--bg-secondary);
-            color: var(--text-secondary);
-            font-weight: 600;
-            text-align: left;
-            padding: 12px 16px;
-            font-size: 13px;
-            border-bottom: 1px solid var(--border);
+            z-index: 10;
+            box-shadow: 0 1px 0 var(--border);
         }
 
         tbody td {
-            padding: 16px;
+            padding: 12px;
             border-bottom: 1px solid var(--border);
             color: var(--text-primary);
         }
@@ -341,32 +540,36 @@
         .severity-badge {
             display: inline-flex;
             align-items: center;
-            padding: 4px 12px;
+            padding: 3px 8px;
             border-radius: 12px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             gap: 6px;
         }
 
         .severity-badge.critical {
-            background: #FFEBEE;
-            color: var(--error);
+            background: #FFF1F0;
+            color: #CF1322;
+            border: 1px solid #FFA39E;
         }
 
         .severity-badge.warning {
-            background: #FFF3E0;
-            color: var(--warning);
+            background: #FFF7E6;
+            color: #D46B08;
+            border: 1px solid #FFD591;
         }
 
         .severity-badge.info {
-            background: #E8F3FF;
-            color: var(--primary);
+            background: #F0F5FF;
+            color: #2F54EB;
+            border: 1px solid #ADC6FF;
         }
 
         .severity-dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
+            animation: pulse 2s infinite;
         }
 
         .severity-badge.critical .severity-dot { background: var(--error); }
@@ -374,180 +577,139 @@
         .severity-badge.info .severity-dot { background: var(--primary); }
 
         /* SQL Code */
+        .sql-code-container {
+            position: relative;
+        }
+
         .sql-code {
-            background: #F8F9FA;
+            position: relative;
+            padding-right: 40px; /* Space for copy button */
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            background-color: var(--bg-secondary);
+            padding: 8px 12px;
+            border-radius: 4px;
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            padding: 16px;
-            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-            font-size: 13px;
-            color: var(--text-primary);
-            overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-all;
-            max-height: 200px;
-            overflow-y: auto;
         }
 
-        /* Collapsible Section */
-        .collapsible {
+        .copy-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            padding: 4px 8px;
+            background: var(--bg-primary);
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            margin-bottom: 12px;
-            overflow: hidden;
-        }
-
-        .collapsible-header {
-            background: var(--bg-secondary);
-            padding: 14px 16px;
+            border-radius: 4px;
+            font-size: 12px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            user-select: none;
-            transition: background 0.2s;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            opacity: 0;
         }
 
-        .collapsible-header:hover {
-            background: #EEF0F2;
+        .sql-code-container:hover .copy-btn {
+            opacity: 1;
         }
 
-        .collapsible-title {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-weight: 500;
-        }
-
-        .collapsible-icon {
-            transition: transform 0.2s;
-        }
-
-        .collapsible.expanded .collapsible-icon {
-            transform: rotate(180deg);
-        }
-
-        .collapsible-body {
-            display: none;
-            padding: 16px;
-        }
-
-        .collapsible.expanded .collapsible-body {
-            display: block;
-        }
-
-        /* Location Tags */
-        .location-tag {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 10px;
+        .copy-btn:hover {
             background: var(--primary-light);
             color: var(--primary);
-            border-radius: var(--radius-sm);
-            font-size: 12px;
-            margin: 4px;
-            font-family: monospace;
+            border-color: var(--primary);
         }
 
-        /* Issue List */
-        .issue-list {
-            list-style: none;
-        }
-
-        .issue-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .issue-item:last-child {
-            border-bottom: none;
-        }
-
-        .issue-icon {
-            flex-shrink: 0;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            font-size: 12px;
-            margin-top: 2px;
-        }
-
-        .issue-icon.critical { background: #FFEBEE; color: var(--error); }
-        .issue-icon.warning { background: #FFF3E0; color: var(--warning); }
-        .issue-icon.info { background: #E8F3FF; color: var(--primary); }
-
-        .issue-content {
-            flex: 1;
-        }
-
-        .issue-message {
-            font-weight: 500;
-            margin-bottom: 4px;
-        }
-
-        .issue-suggestion {
-            font-size: 13px;
-            color: var(--text-secondary);
-        }
-
-        /* Explain Plan */
-        .explain-plan {
-            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-            font-size: 12px;
-            background: #F8F9FA;
-            border-radius: var(--radius-md);
-            padding: 16px;
-        }
-
-        .explain-node {
-            padding: 8px 0;
-            padding-left: 20px;
-            border-left: 2px solid var(--border);
-        }
-
-        .explain-node.root {
-            border-left: none;
-            padding-left: 0;
-        }
-
-        .explain-type {
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        .explain-table {
-            color: var(--warning);
-        }
+        /* Simple Syntax Highlighting */
+        .hl-keyword { color: #d73a49; font-weight: bold; } /* Red for keywords */
+        .hl-string { color: #032f62; } /* Blue for strings */
+        .hl-number { color: #005cc5; } /* Dark blue for numbers */
+        .hl-comment { color: #6a737d; font-style: italic; } /* Gray for comments */
+        .hl-function { color: #6f42c1; } /* Purple for functions */
 
         /* Footer */
         .footer {
             text-align: center;
-            padding: 24px;
+            padding: 24px 24px 32px;
             color: var(--text-secondary);
             font-size: 13px;
+            position: relative;
+        }
+
+        .footer::before {
+            content: '';
+            display: block;
+            height: 2px;
+            background: var(--spectrum-gradient);
+            margin: 0 auto 24px;
+            max-width: 200px;
+            border-radius: 1px;
+        }
+
+        .footer-brand {
+            font-weight: 600;
+            background: var(--spectrum-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Pulse animation for severity dots */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         /* Filters */
-        .filters {
-            display: flex;
+        .filter-panel {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 12px;
+            align-items: end;
             margin-bottom: 16px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .filter-control {
+            height: 34px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            padding: 0 10px;
+            font-size: 13px;
+            background: white;
+            color: var(--text-primary);
+        }
+
+        .filter-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.15);
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 8px;
             flex-wrap: wrap;
         }
 
         .filter-btn {
-            padding: 8px 16px;
+            padding: 6px 12px;
             border: 1px solid var(--border);
             background: white;
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             color: var(--text-secondary);
             transition: all 0.2s;
         }
@@ -557,10 +719,15 @@
             color: var(--primary);
         }
 
-        .filter-btn.active {
+        .filter-btn.primary {
             background: var(--primary);
             color: white;
             border-color: var(--primary);
+        }
+
+        .filter-btn.primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
         }
 
         /* Chart Section */
@@ -680,6 +847,38 @@
             opacity: 0.5;
         }
 
+        /* Back to Top */
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 100;
+            font-size: 20px;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .back-to-top:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .container {
@@ -713,11 +912,39 @@
     <!-- Header -->
     <div class="header">
         <div class="header-content">
-            <h1>🔍 SQL 检查报告</h1>
+            <!-- Logo SVG -->
+            <div class="header-logo">
+                <svg viewBox="0 0 48 48" width="48" height="48" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="spectrumGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#FF4D4F"/>
+                            <stop offset="20%" style="stop-color:#FF7A45"/>
+                            <stop offset="40%" style="stop-color:#FFC53D"/>
+                            <stop offset="60%" style="stop-color:#52C41A"/>
+                            <stop offset="80%" style="stop-color:#1890FF"/>
+                            <stop offset="100%" style="stop-color:#722ED1"/>
+                        </linearGradient>
+                    </defs>
+                    <!-- Prism -->
+                    <polygon points="24,6 38,38 10,38" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+                    <!-- Incident light -->
+                    <line x1="2" y1="22" x2="16" y2="22" stroke="#FFFFFF" stroke-width="2"/>
+                    <!-- Spectrum rays -->
+                    <line x1="32" y1="20" x2="46" y2="14" stroke="#FF4D4F" stroke-width="1.5"/>
+                    <line x1="32" y1="22" x2="46" y2="20" stroke="#FF7A45" stroke-width="1.5"/>
+                    <line x1="32" y1="24" x2="46" y2="26" stroke="#FFC53D" stroke-width="1.5"/>
+                    <line x1="32" y1="26" x2="46" y2="32" stroke="#52C41A" stroke-width="1.5"/>
+                    <line x1="32" y1="28" x2="46" y2="38" stroke="#1890FF" stroke-width="1.5"/>
+                </svg>
+            </div>
+            <div class="header-info">
+                <h1>光谱 SQL Checker</h1>
+                <div class="header-subtitle">SQL 质量检测报告</div>
+            </div>
             <div class="header-meta">
-                生成时间: {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}
+                <div>生成时间: {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}</div>
                 {% if summary.durationMs > 0 %}
-                • 扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}s
+                <div>扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}s</div>
                 {% endif %}
             </div>
         </div>
@@ -734,14 +961,31 @@
                 </div>
             </div>
             <div class="card-body">
+                <div class="scan-meta">
+                    <div class="scan-meta-item">
+                        <span class="scan-meta-label">项目</span>
+                        <span class="scan-meta-value">{{ summary.projectName | default('未命名项目') }}</span>
+                    </div>
+                    {% if summary.scanPath %}
+                    <div class="scan-meta-item scan-meta-path">
+                        <span class="scan-meta-label">路径</span>
+                        <span class="scan-meta-value" title="{{ summary.scanPath }}">{{ summary.scanPath }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="scan-meta-item">
+                        <span class="scan-meta-label">文件</span>
+                        <span class="scan-meta-value">{{ summary.totalFiles }}</span>
+                        <span class="scan-meta-sub">Java {{ summary.javaFiles }} · XML {{ summary.xmlFiles }} · SQL {{ summary.sqlFiles }}</span>
+                    </div>
+                </div>
                 <div class="overview">
                     <div class="overview-score">
                         {% if summary.averageScore >= 80 %}
-                        <div class="score-badge excellent">{{ summary.averageScore | numberFormat }}</div>
+                        <div class="score-badge excellent has-tooltip" data-tooltip="{{ summary.scoreFormula | default('') }}">{{ summary.averageScore | numberFormat }}</div>
                         {% elseif summary.averageScore >= 60 %}
-                        <div class="score-badge good">{{ summary.averageScore | numberFormat }}</div>
+                        <div class="score-badge good has-tooltip" data-tooltip="{{ summary.scoreFormula | default('') }}">{{ summary.averageScore | numberFormat }}</div>
                         {% else %}
-                        <div class="score-badge poor">{{ summary.averageScore | numberFormat }}</div>
+                        <div class="score-badge poor has-tooltip" data-tooltip="{{ summary.scoreFormula | default('') }}">{{ summary.averageScore | numberFormat }}</div>
                         {% endif %}
                         <div class="overview-label">平均得分</div>
                     </div>
@@ -968,40 +1212,34 @@
 
                     <!-- Bar Chart -->
                     <div class="chart-container">
-                        <div class="chart-title">问题构成</div>
+                        <div class="chart-title">问题构成（静态 / EXPLAIN）</div>
                         <div class="bar-chart" id="barChart">
-                            {% if summary.criticalIssues > 0 %}
+                            {% set issueTotal = summary.staticIssueTotal + summary.explainIssueTotal %}
+                            {% if issueTotal > 0 %}
+                            {% if summary.staticIssueTotal > 0 %}
                             <div class="bar-item">
-                                <div class="bar-label">严重</div>
+                                <div class="bar-label">静态规则</div>
                                 <div class="bar-track">
-                                    <div class="bar-fill critical" style="width: {{ (summary.criticalIssues * 100 / summary.totalIssues) | numberFormat }}%;">
-                                        {{ (summary.criticalIssues * 100 / summary.totalIssues) | numberFormat }}%
+                                    <div class="bar-fill info" style="width: {{ (summary.staticIssueTotal * 100 / issueTotal) | numberFormat }}%;">
+                                        {{ (summary.staticIssueTotal * 100 / issueTotal) | numberFormat }}%
                                     </div>
                                 </div>
-                                <div class="bar-value">{{ summary.criticalIssues }}</div>
+                                <div class="bar-value">{{ summary.staticIssueTotal }}</div>
                             </div>
                             {% endif %}
-                            {% if summary.warningIssues > 0 %}
+                            {% if summary.explainIssueTotal > 0 %}
                             <div class="bar-item">
-                                <div class="bar-label">警告</div>
+                                <div class="bar-label">EXPLAIN 规则</div>
                                 <div class="bar-track">
-                                    <div class="bar-fill warning" style="width: {{ (summary.warningIssues * 100 / summary.totalIssues) | numberFormat }}%;">
-                                        {{ (summary.warningIssues * 100 / summary.totalIssues) | numberFormat }}%
+                                    <div class="bar-fill success" style="width: {{ (summary.explainIssueTotal * 100 / issueTotal) | numberFormat }}%;">
+                                        {{ (summary.explainIssueTotal * 100 / issueTotal) | numberFormat }}%
                                     </div>
                                 </div>
-                                <div class="bar-value">{{ summary.warningIssues }}</div>
+                                <div class="bar-value">{{ summary.explainIssueTotal }}</div>
                             </div>
                             {% endif %}
-                            {% if summary.infoIssues > 0 %}
-                            <div class="bar-item">
-                                <div class="bar-label">提示</div>
-                                <div class="bar-track">
-                                    <div class="bar-fill info" style="width: {{ (summary.infoIssues * 100 / summary.totalIssues) | numberFormat }}%;">
-                                        {{ (summary.infoIssues * 100 / summary.totalIssues) | numberFormat }}%
-                                    </div>
-                                </div>
-                                <div class="bar-value">{{ summary.infoIssues }}</div>
-                            </div>
+                            {% else %}
+                            <div class="stat-row-label">暂无数据</div>
                             {% endif %}
                         </div>
                     </div>
@@ -1019,12 +1257,97 @@
                 </div>
             </div>
             <div class="card-body">
-                <div class="filters">
-                    <button class="filter-btn active" onclick="filterBySeverity('all')">全部</button>
-                    <button class="filter-btn" onclick="filterBySeverity('critical')">严重</button>
-                    <button class="filter-btn" onclick="filterBySeverity('warning')">警告</button>
-                    <button class="filter-btn" onclick="filterBySeverity('info')">提示</button>
-                </div>
+                <form class="filter-panel" id="sql-filter-form">
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-severity">严重级别</label>
+                        <select class="filter-control" id="filter-severity">
+                            <option value="all">全部</option>
+                            <option value="critical">严重</option>
+                            <option value="warning">警告</option>
+                            <option value="info">提示</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-category">SQL 分类</label>
+                        <select class="filter-control" id="filter-category">
+                            <option value="all">全部</option>
+                            <option value="mybatis_xml_static">MyBatis XML 静态</option>
+                            <option value="mybatis_xml_dynamic">MyBatis XML 动态</option>
+                            <option value="mybatis_annotation">MyBatis 注解</option>
+                            <option value="jpa_native_query">JPA 原生查询</option>
+                            <option value="string_concat">字符串拼接</option>
+                            <option value="placeholder_template">占位符模板</option>
+                            <option value="unknown">未知</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-validity">合法性</label>
+                        <select class="filter-control" id="filter-validity">
+                            <option value="all">全部</option>
+                            <option value="valid">合法</option>
+                            <option value="invalid">非法</option>
+                            <option value="unknown">未知</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-explain">EXPLAIN 可执行性</label>
+                        <select class="filter-control" id="filter-explain">
+                            <option value="all">全部</option>
+                            <option value="supported">可执行</option>
+                            <option value="not_supported">不支持</option>
+                            <option value="skipped">已跳过</option>
+                            <option value="unknown">未知</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-source">来源类型</label>
+                        <select class="filter-control" id="filter-source">
+                            <option value="all">全部</option>
+                            <option value="java">Java</option>
+                            <option value="javascript">JavaScript/TypeScript</option>
+                            <option value="mybatis">MyBatis XML</option>
+                            <option value="mybatis_annotation">MyBatis 注解</option>
+                            <option value="jpa_annotation">JPA 注解</option>
+                            <option value="string_literal">字符串拼接</option>
+                            <option value="sql_file">SQL 文件</option>
+                            <option value="unknown">未知</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-score-min">评分区间</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input class="filter-control" id="filter-score-min" type="number" min="0" max="100" placeholder="最低">
+                            <input class="filter-control" id="filter-score-max" type="number" min="0" max="100" placeholder="最高">
+                        </div>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-rule-type">规则类型</label>
+                        <select class="filter-control" id="filter-rule-type">
+                            <option value="all">全部</option>
+                            <option value="static">静态规则</option>
+                            <option value="explain">EXPLAIN 规则</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-issue-min">最小问题数</label>
+                        <input class="filter-control" id="filter-issue-min" type="number" min="0" placeholder="如 1">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-rule-keyword">规则关键词</label>
+                        <input class="filter-control" id="filter-rule-keyword" type="text" placeholder="规则名称/描述">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label" for="filter-keyword">关键词</label>
+                        <input class="filter-control" id="filter-keyword" type="text" placeholder="SQL / 文件 / 规则">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">操作</label>
+                        <div class="filter-actions">
+                            <button class="filter-btn primary" type="button" onclick="applyFilters()">应用筛选</button>
+                            <button class="filter-btn" type="button" onclick="resetFilters()">清空</button>
+                        </div>
+                    </div>
+                </form>
 
                 {% if sqlStatements is empty %}
                 <div class="empty-state">
@@ -1045,7 +1368,34 @@
                         </thead>
                         <tbody>
                             {% for sql in sqlStatements %}
-                            <tr data-severity="{{ sql.severity | lower }}">
+                            {% set sourceType = (sql.locations is not empty and sql.locations[0].sourceType is not null) ? (sql.locations[0].sourceType | lower) : 'unknown' %}
+                            {% set searchText = (sql.abstractSql | default('')) ~ ' ' ~ (sql.originalSql | default('')) ~ ' ' ~ (sql.locations is not empty ? (sql.locations[0].fileName | default('')) : '') %}
+                            {% set staticIssueCount = (sql.staticAnalysis is defined and sql.staticAnalysis is not null and sql.staticAnalysis.issues is not null) ? sql.staticAnalysis.issues.size() : 0 %}
+                            {% set explainIssueCount = (sql.explainAnalysis is defined and sql.explainAnalysis is not null and sql.explainAnalysis.issues is not null) ? sql.explainAnalysis.issues.size() : 0 %}
+                            {% set totalIssueCount = staticIssueCount + explainIssueCount %}
+                            {% set ruleKeywords = '' %}
+                            {% if sql.staticAnalysis is defined and sql.staticAnalysis is not null and sql.staticAnalysis.issues is not null %}
+                                {% for issue in sql.staticAnalysis.issues %}
+                                    {% set ruleKeywords = ruleKeywords ~ ' ' ~ (issue.type | default('')) ~ ' ' ~ (issue.message | default('')) %}
+                                {% endfor %}
+                            {% endif %}
+                            {% if sql.explainAnalysis is defined and sql.explainAnalysis is not null and sql.explainAnalysis.issues is not null %}
+                                {% for issue in sql.explainAnalysis.issues %}
+                                    {% set ruleKeywords = ruleKeywords ~ ' ' ~ (issue.type | default('')) ~ ' ' ~ (issue.message | default('')) %}
+                                {% endfor %}
+                            {% endif %}
+                            <tr data-severity="{{ sql.severity | default('info') | lower }}"
+                                data-category="{{ sql.category | default('unknown') | lower }}"
+                                data-validity="{{ sql.validity | default('unknown') | lower }}"
+                                data-explain="{{ sql.explainEligibility | default('unknown') | lower }}"
+                                data-source="{{ sourceType }}"
+                                data-score="{{ sql.score | default(0) }}"
+                                data-search="{{ searchText | lower }}"
+                                data-static-count="{{ staticIssueCount }}"
+                                data-explain-count="{{ explainIssueCount }}"
+                                data-issue-count="{{ totalIssueCount }}"
+                                data-rule-keywords="{{ ruleKeywords | lower }}"
+                                data-sql-id="{{ sql.id }}">
                                 <td>
                                     <span class="severity-badge {{ sql.severity | lower }}">
                                         <span class="severity-dot"></span>
@@ -1055,14 +1405,20 @@
                                     </span>
                                 </td>
                                 <td>
-                                    <strong>{{ sql.score }}</strong>
+                                    <strong class="has-tooltip" data-tooltip="{{ sql.scoreExplanation | default('') }}">{{ sql.score }}</strong>
                                 </td>
                                 <td>
-                                    <div class="sql-code">{{ sql.abstractSql }}</div>
+                                    <div class="sql-code-container">
+                                        <div class="sql-code highlight-sql">{{ sql.abstractSql }}</div>
+                                        <button class="copy-btn" onclick="copyToClipboard(this)">复制</button>
+                                    </div>
                                     {% if sql.originalSql != sql.abstractSql %}
                                     <details style="margin-top: 8px;">
                                         <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">查看原始 SQL</summary>
-                                        <div class="sql-code" style="margin-top: 8px;">{{ sql.originalSql }}</div>
+                                        <div class="sql-code-container" style="margin-top: 8px;">
+                                            <div class="sql-code highlight-sql">{{ sql.originalSql }}</div>
+                                            <button class="copy-btn" onclick="copyToClipboard(this)">复制</button>
+                                        </div>
                                     </details>
                                     {% endif %}
                                 </td>
@@ -1079,16 +1435,16 @@
                             <!-- Details Row (Hidden by default) -->
                             <tr id="details-{{ sql.id }}" style="display: none;">
                                 <td colspan="5" style="padding: 0;">
-                                    <div style="padding: 20px; background: var(--bg-secondary);">
+                                    <div style="padding: 14px; background: var(--bg-secondary);">
                                         <!-- Preprocess Info -->
-                                        <h4 style="margin-bottom: 12px;">🧹 预处理信息</h4>
-                                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+                                        <h4 style="margin-bottom: 8px;">🧹 预处理信息</h4>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">
                                             分类: {{ sql.category }} |
                                             合法性: {{ sql.validity }} |
                                             Explain 可执行性: {{ sql.explainEligibility }}
                                         </div>
                                         {% if sql.preprocessErrorReason %}
-                                        <div style="font-size: 12px; color: var(--warning); margin-bottom: 8px;">
+                                        <div style="font-size: 12px; color: var(--warning); margin-bottom: 6px;">
                                             {{ sql.preprocessErrorReason }}
                                         </div>
                                         {% endif %}
@@ -1101,12 +1457,15 @@
                                         {% if sql.explainSql %}
                                         <details style="margin-bottom: 12px;">
                                             <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">查看 Explain SQL</summary>
-                                            <div class="sql-code" style="margin-top: 8px;">{{ sql.explainSql }}</div>
+                                            <div class="sql-code-container" style="margin-top: 8px;">
+                                                <div class="sql-code highlight-sql">{{ sql.explainSql }}</div>
+                                                <button class="copy-btn" onclick="copyToClipboard(this)">复制</button>
+                                            </div>
                                         </details>
                                         {% endif %}
                                         <!-- Static Analysis -->
                                         {% if sql.staticAnalysis is defined and sql.staticAnalysis is not null %}
-                                        <h4 style="margin-bottom: 12px;">📋 静态分析结果</h4>
+                                        <h4 style="margin-bottom: 8px;">📋 静态分析结果</h4>
                                         {% if sql.staticAnalysis.issues is defined and sql.staticAnalysis.issues is not null and sql.staticAnalysis.issues.size() > 0 %}
                                         <ul class="issue-list">
                                             {% for issue in sql.staticAnalysis.issues %}
@@ -1125,19 +1484,19 @@
                                         <p style="color: var(--text-secondary);">未发现问题</p>
                                         {% endif %}
                                         {% else %}
-                                        <h4 style="margin-bottom: 12px;">📋 静态分析结果</h4>
+                                        <h4 style="margin-bottom: 8px;">📋 静态分析结果</h4>
                                         <p style="color: var(--text-secondary);">未发现问题</p>
                                         {% endif %}
 
                                         <!-- EXPLAIN Analysis -->
                                         {% if sql.explainEligibility is defined and sql.explainEligibility == 'NOT_SUPPORTED' %}
-                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <h4 style="margin: 12px 0 8px;">📊 执行计划分析 (EXPLAIN)</h4>
                                         <p style="color: var(--text-secondary);">
                                             已跳过: {{ sql.explainEligibility }}
                                             {% if sql.preprocessErrorReason %} ({{ sql.preprocessErrorReason }}){% endif %}
                                         </p>
                                         {% elseif sql.explainAnalysis is defined and sql.explainAnalysis is not null and sql.explainAnalysis.plan is defined and sql.explainAnalysis.plan is not null %}
-                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <h4 style="margin: 12px 0 8px;">📊 执行计划分析 (EXPLAIN)</h4>
                                         <div class="explain-plan">
                                             {% for node in sql.explainAnalysis.plan.nodes %}
                                             <div class="explain-node {{ node.id == '1' ? 'root' : '' }}">
@@ -1159,7 +1518,7 @@
                                             {% endfor %}
                                         </div>
                                         {% if sql.explainAnalysis.issues is defined and sql.explainAnalysis.issues is not null and sql.explainAnalysis.issues.size() > 0 %}
-                                        <ul class="issue-list" style="margin-top: 12px;">
+                                        <ul class="issue-list" style="margin-top: 8px;">
                                             {% for issue in sql.explainAnalysis.issues %}
                                             <li class="issue-item">
                                                 <span class="issue-icon {{ issue.severity | lower }}">!</span>
@@ -1174,16 +1533,16 @@
                                         </ul>
                                         {% endif %}
                                         {% elseif sql.explainAnalysis is defined and sql.explainAnalysis is not null %}
-                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <h4 style="margin: 12px 0 8px;">📊 执行计划分析 (EXPLAIN)</h4>
                                         <p style="color: var(--text-secondary);">动态分析需要配置数据库连接，当前未启用</p>
                                         {% else %}
-                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <h4 style="margin: 12px 0 8px;">📊 执行计划分析 (EXPLAIN)</h4>
                                         <p style="color: var(--text-secondary);">动态分析需要配置数据库连接，当前未启用</p>
                                         {% endif %}
 
                                         <!-- Expert Analysis -->
                                         {% if sql.expertAnalysis is defined and sql.expertAnalysis is not null and sql.expertAnalysis.recommendations is defined and sql.expertAnalysis.recommendations is not null and sql.expertAnalysis.recommendations.size() > 0 %}
-                                        <h4 style="margin: 20px 0 12px;">🎯 专家建议</h4>
+                                        <h4 style="margin: 12px 0 8px;">🎯 专家建议</h4>
                                         <ul class="issue-list">
                                             {% for rec in sql.expertAnalysis.recommendations %}
                                             <li class="issue-item">
@@ -1219,10 +1578,14 @@
         </div>
     </div>
 
+    <div class="back-to-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+        ↑
+    </div>
+
     <!-- Footer -->
     <div class="footer">
-        <p>由 <strong>SQL Checker</strong> 生成 | v1.0.0</p>
-        <p style="margin-top: 4px;">扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}秒</p>
+        <p>由 <span class="footer-brand">光谱 SQL Checker</span> 生成 | v1.0.0</p>
+        <p style="margin-top: 8px; font-size: 12px;">扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}秒</p>
     </div>
 
     <script>
@@ -1244,10 +1607,11 @@
             const centerY = canvas.height / 2;
             const radius = Math.min(centerX, centerY) - 10;
 
+            // Spectrum colors for chart
             const data = [
-                { value: chartData.critical, color: '#F54A45', label: 'Critical' },
-                { value: chartData.warning, color: '#FF8800', label: 'Warning' },
-                { value: chartData.info, color: '#3370FF', label: 'Info' }
+                { value: chartData.critical, color: '#FF4D4F', label: 'Critical' },
+                { value: chartData.warning, color: '#FF7A45', label: 'Warning' },
+                { value: chartData.info, color: '#597EF7', label: 'Info' }
             ].filter(d => d.value > 0);
 
             if (data.length === 0) {
@@ -1297,6 +1661,7 @@
         // Toggle details
         function toggleDetails(id) {
             const row = document.getElementById('details-' + id);
+            if (!row) return;
             if (row.style.display === 'none') {
                 row.style.display = 'table-row';
             } else {
@@ -1304,23 +1669,87 @@
             }
         }
 
-        // Filter by severity
-        function filterBySeverity(severity) {
+        function getFilterValues() {
+            const severity = document.getElementById('filter-severity')?.value || 'all';
+            const category = document.getElementById('filter-category')?.value || 'all';
+            const validity = document.getElementById('filter-validity')?.value || 'all';
+            const explain = document.getElementById('filter-explain')?.value || 'all';
+            const source = document.getElementById('filter-source')?.value || 'all';
+            const minScore = document.getElementById('filter-score-min')?.value || '';
+            const maxScore = document.getElementById('filter-score-max')?.value || '';
+            const ruleType = document.getElementById('filter-rule-type')?.value || 'all';
+            const minIssues = document.getElementById('filter-issue-min')?.value || '';
+            const ruleKeyword = (document.getElementById('filter-rule-keyword')?.value || '').trim().toLowerCase();
+            const keyword = (document.getElementById('filter-keyword')?.value || '').trim().toLowerCase();
+            return { severity, category, validity, explain, source, minScore, maxScore, ruleType, minIssues, ruleKeyword, keyword };
+        }
+
+        function applyFilters() {
+            const filters = getFilterValues();
             const rows = document.querySelectorAll('tbody tr[data-severity]');
-            const buttons = document.querySelectorAll('.filter-btn');
 
-            // Update button states
-            buttons.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
-
-            // Filter rows
             rows.forEach(row => {
-                if (severity === 'all' || row.dataset.severity === severity) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
+                const severity = row.dataset.severity || 'info';
+                const category = row.dataset.category || 'unknown';
+                const validity = row.dataset.validity || 'unknown';
+                const explain = row.dataset.explain || 'unknown';
+                const source = row.dataset.source || 'unknown';
+                const score = parseInt(row.dataset.score || '0', 10);
+                const search = row.dataset.search || '';
+                const staticCount = parseInt(row.dataset.staticCount || '0', 10);
+                const explainCount = parseInt(row.dataset.explainCount || '0', 10);
+                const issueCount = parseInt(row.dataset.issueCount || '0', 10);
+                const ruleKeywords = row.dataset.ruleKeywords || '';
+
+                let visible = true;
+                if (filters.severity !== 'all' && severity !== filters.severity) visible = false;
+                if (filters.category !== 'all' && category !== filters.category) visible = false;
+                if (filters.validity !== 'all' && validity !== filters.validity) visible = false;
+                if (filters.explain !== 'all' && explain !== filters.explain) visible = false;
+                if (filters.source !== 'all' && source !== filters.source) visible = false;
+
+                if (filters.minScore !== '' && score < parseInt(filters.minScore, 10)) visible = false;
+                if (filters.maxScore !== '' && score > parseInt(filters.maxScore, 10)) visible = false;
+                if (filters.ruleType === 'static' && staticCount === 0) visible = false;
+                if (filters.ruleType === 'explain' && explainCount === 0) visible = false;
+                if (filters.minIssues !== '' && issueCount < parseInt(filters.minIssues, 10)) visible = false;
+                if (filters.ruleKeyword && !ruleKeywords.includes(filters.ruleKeyword)) visible = false;
+                if (filters.keyword && !search.includes(filters.keyword)) visible = false;
+
+                row.style.display = visible ? '' : 'none';
+
+                const detailsRow = document.getElementById('details-' + row.dataset.sqlId);
+                if (detailsRow && !visible) {
+                    detailsRow.style.display = 'none';
                 }
             });
+        }
+
+        function resetFilters() {
+            const severity = document.getElementById('filter-severity');
+            const category = document.getElementById('filter-category');
+            const validity = document.getElementById('filter-validity');
+            const explain = document.getElementById('filter-explain');
+            const source = document.getElementById('filter-source');
+            const minScore = document.getElementById('filter-score-min');
+            const maxScore = document.getElementById('filter-score-max');
+            const ruleType = document.getElementById('filter-rule-type');
+            const minIssues = document.getElementById('filter-issue-min');
+            const ruleKeyword = document.getElementById('filter-rule-keyword');
+            const keyword = document.getElementById('filter-keyword');
+
+            if (severity) severity.value = 'all';
+            if (category) category.value = 'all';
+            if (validity) validity.value = 'all';
+            if (explain) explain.value = 'all';
+            if (source) source.value = 'all';
+            if (minScore) minScore.value = '';
+            if (maxScore) maxScore.value = '';
+            if (ruleType) ruleType.value = 'all';
+            if (minIssues) minIssues.value = '';
+            if (ruleKeyword) ruleKeyword.value = '';
+            if (keyword) keyword.value = '';
+            applyFilters();
         }
 
         // Collapsible sections
@@ -1330,9 +1759,88 @@
             });
         });
 
-        // Initialize charts on page load
+        // Debounce utility
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(btn) {
+            const container = btn.parentElement;
+            const codeBlock = container.querySelector('.sql-code');
+            const code = codeBlock.innerText || codeBlock.textContent;
+            
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '已复制';
+                btn.style.color = '#52C41A';
+                btn.style.borderColor = '#52C41A';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                btn.textContent = '失败';
+            });
+        }
+
+        // Simple SQL Syntax Highlighter
+        function highlightSql() {
+            const keywords = /\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|AND|OR|GROUP BY|ORDER BY|LIMIT|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|IN|IS|NULL|NOT|CREATE|TABLE|DROP|ALTER|INDEX|VIEW|UNION|ALL|HAVING|DISTINCT|CASE|WHEN|THEN|ELSE|END|EXISTS|LIKE|BETWEEN|VALUES|SET|INTO|DESC|ASC|COUNT|SUM|AVG|MAX|MIN)\b/gi;
+            const strings = /'[^']*'/g;
+            const numbers = /\b\d+\b/g;
+
+            document.querySelectorAll('.highlight-sql').forEach(el => {
+                if (el.dataset.highlighted) return;
+                
+                let html = el.textContent;
+                html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                
+                html = html.replace(keywords, '<span class="hl-keyword">$1</span>')
+                           .replace(strings, '<span class="hl-string">$&</span>')
+                           .replace(numbers, '<span class="hl-number">$&</span>');
+                
+                el.innerHTML = html;
+                el.dataset.highlighted = 'true';
+            });
+        }
+        
+        const debouncedApplyFilters = debounce(applyFilters, 300);
+
+        // Initialize charts + filters on page load
         window.addEventListener('load', () => {
             drawPieChart();
+            highlightSql();
+            // applyFilters();
+
+            const filterForm = document.getElementById('sql-filter-form');
+            if (filterForm) {
+                filterForm.querySelectorAll('select').forEach(el => {
+                    el.addEventListener('change', applyFilters);
+                });
+                filterForm.querySelectorAll('input').forEach(el => {
+                    el.addEventListener('input', debouncedApplyFilters);
+                });
+            }
+            
+            // Back to top visibility
+            const backToTopBtn = document.querySelector('.back-to-top');
+            if (backToTopBtn) {
+                window.addEventListener('scroll', () => {
+                    if (window.scrollY > 300) {
+                        backToTopBtn.classList.add('visible');
+                    } else {
+                        backToTopBtn.classList.remove('visible');
+                    }
+                });
+            }
         });
     </script>
 </body>

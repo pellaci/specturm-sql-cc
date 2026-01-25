@@ -40,15 +40,15 @@ public class DmlSchemaInferrer {
         Map<String, Set<String>> tableColumns = new LinkedHashMap<>();
 
         for (String sql : dmlStatements) {
+            String processedSql = preprocessSql(sql);
             try {
                 // 预处理 SQL，替换 MyBatis 占位符
-                String processedSql = preprocessSql(sql);
                 Statement stmt = CCJSqlParserUtil.parse(processedSql);
                 extractTableAndColumns(stmt, tableColumns);
             } catch (JSQLParserException e) {
                 log.debug("Failed to parse SQL for schema inference: {}",
                         sql.substring(0, Math.min(100, sql.length())));
-                fallbackExtractFromSql(sql, tableColumns);
+                fallbackExtractFromSql(processedSql, tableColumns);
             }
         }
 
@@ -59,6 +59,9 @@ public class DmlSchemaInferrer {
      * 预处理 SQL，替换 MyBatis 占位符为有效值
      */
     private String preprocessSql(String sql) {
+        if (sql == null) {
+            return "";
+        }
         // 替换 #{xxx} 为 'placeholder'
         String processed = sql.replaceAll("#\\{[^}]+\\}", "'placeholder'");
         // 替换 ${xxx} 为 placeholder
@@ -67,14 +70,90 @@ public class DmlSchemaInferrer {
         processed = processed.replaceAll("/\\*\\s*INCLUDE:[^*]+\\*/", "*");
         // 移除 BIND 注释
         processed = processed.replaceAll("/\\*\\s*BIND:[^*]+\\*/", "");
+        // 移除其他块注释与行注释，避免干扰解析
+        processed = processed.replaceAll("(?s)/\\*.*?\\*/", " ");
+        processed = processed.replaceAll("(?m)--.*$", " ");
         // 修正常见动态 SQL 片段导致的语法问题
         processed = processed.replaceAll("(?i)\\bFROM\\s+([`\\w.]+)\\s+AND\\b", "FROM $1 WHERE ");
+        processed = processed.replaceAll("(?i)\\bWHERE\\s+(AND|OR)\\b", "WHERE ");
+        processed = processed.replaceAll("(?i)\\b(AND|OR)\\s+(AND|OR)\\b", "$1");
         processed = processed.replaceAll("(?i)\\bSET\\s*,\\s*", "SET ");
         processed = processed.replaceAll(",\\s*,", ",");
         processed = processed.replaceAll("(?i),\\s*(WHERE|AND|OR|GROUP\\s+BY|ORDER\\s+BY|LIMIT)", " $1");
         processed = processed.replaceAll("(?i)\\bCASE\\s+([`\\w\\.]+)\\s+([^\\s]+)\\s+END", "CASE WHEN $1 THEN $2 END");
         processed = processed.replaceAll("(?i)\\bCASE\\s+([`\\w\\.]+)\\s+END", "CASE WHEN $1 THEN 1 END");
+        // 去除多余逗号与空括号
+        processed = processed.replaceAll("\\(\\s*,", "(");
+        processed = processed.replaceAll(",\\s*\\)", ")");
+        processed = processed.replaceAll(",\\s*;", ";");
+        processed = processed.replaceAll(",\\s*$", "");
+        processed = processed.replaceAll("(?i)\\bIN\\s*\\(\\s*\\)", "IN (NULL)");
+        processed = processed.replaceAll("(?i)\\bVALUES\\s*\\(\\s*\\)", "VALUES (NULL)");
+        processed = processed.replaceAll("(?i)=\\s*(,|\\)|\\bWHERE\\b|\\bAND\\b|\\bOR\\b|\\bGROUP\\b|\\bORDER\\b|\\bLIMIT\\b|$)", "= 1 $1");
+        processed = processed.replaceAll("(?i)\\bWHERE\\s*(GROUP\\s+BY|ORDER\\s+BY|LIMIT|$)", "WHERE 1=1 $1");
+        // 规整空白
+        processed = processed.replaceAll("[\\r\\n\\t]+", " ");
+        processed = processed.replaceAll("\\s+", " ").trim();
+        // 对缺失 VALUES 的 INSERT 做修复
+        processed = ensureInsertHasValues(processed);
+        processed = balanceParentheses(processed);
         return processed;
+    }
+
+    private String ensureInsertHasValues(String sql) {
+        String upper = sql.toUpperCase(Locale.ROOT);
+        if (!upper.startsWith("INSERT")) {
+            return sql;
+        }
+        if (upper.matches(".*\\bVALUES\\b.*") || upper.matches(".*\\bSELECT\\b.*") || upper.matches(".*\\bWITH\\b.*")) {
+            return sql;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?i)\\bINSERT\\s+INTO\\s+[`\\w.]+\\s*\\(([^)]+)\\)")
+                .matcher(sql);
+        if (!matcher.find()) {
+            return sql;
+        }
+        String columns = matcher.group(1);
+        if (columns == null || columns.isBlank()) {
+            return sql;
+        }
+        String[] parts = columns.split(",");
+        List<String> placeholders = new ArrayList<>();
+        for (String part : parts) {
+            String col = part.trim();
+            if (!col.isBlank()) {
+                placeholders.add("1");
+            }
+        }
+        if (placeholders.isEmpty()) {
+            return sql;
+        }
+        String values = " VALUES (" + String.join(", ", placeholders) + ")";
+        return sql + values;
+    }
+
+    private String balanceParentheses(String sql) {
+        if (sql == null || sql.isBlank()) {
+            return sql;
+        }
+        int open = 0;
+        int close = 0;
+        for (char c : sql.toCharArray()) {
+            if (c == '(') {
+                open++;
+            } else if (c == ')') {
+                close++;
+            }
+        }
+        if (open <= close) {
+            return sql;
+        }
+        StringBuilder sb = new StringBuilder(sql);
+        for (int i = 0; i < open - close; i++) {
+            sb.append(')');
+        }
+        return sb.toString();
     }
 
     /**
