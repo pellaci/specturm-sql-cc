@@ -1,20 +1,15 @@
-<p align="center">
-  <img src="docs/brand/logo.svg" alt="光谱 SQL Checker Logo" width="120" height="120">
-</p>
-
 # 光谱 SQL Checker
 
-<p align="center">
-  <strong>🔍 面向 Java/MyBatis 的 SQL 质量检测工具</strong><br>
-  <em>静态分析 + 动态 EXPLAIN（专家规则规划中）</em>
-</p>
+![光谱 SQL Checker Logo](docs/brand/logo.svg)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-722ED1" alt="Version">
-  <img src="https://img.shields.io/badge/Java-17+-1890FF" alt="Java">
-  <img src="https://img.shields.io/badge/Spring%20Boot-3.2-52C41A" alt="Spring Boot">
-  <img src="https://img.shields.io/badge/license-MIT-597EF7" alt="License">
-</p>
+**🔍 面向 Java/MyBatis 的 SQL 质量检测工具**
+
+_静态分析 + 动态 EXPLAIN（专家规则规划中）_
+
+![Version](https://img.shields.io/badge/version-1.0.0-722ED1)
+![Java](https://img.shields.io/badge/Java-17+-1890FF)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-52C41A)
+![License](https://img.shields.io/badge/license-MIT-597EF7)
 
 ---
 
@@ -38,13 +33,16 @@
 光谱 SQL Checker 面向 **Java/MyBatis 技术栈**，在代码库中提取 SQL 并进行质量检测，输出可读的 HTML 报告。
 
 当前已实现：
+
 - 静态分析（基于 JSqlParser AST 的规则检测）
 - 动态 EXPLAIN（连接数据库执行执行计划分析）
 
 规划中：
+
 - 专家规则分析（PRD/ADD 里的“专家规则层”尚未完成）
 
 相关文档：
+
 - PRD：`docs/sql-checker-prd.md`
 - ADD：`docs/sql-checker-add.md`
 - DDD：`docs/sql-checker-ddd.md`
@@ -96,6 +94,7 @@ java -Dsqlchecker.database.auto-init=true -jar target/sql-checker-1.0.0.jar scan
 ```
 
 主要参数：
+
 - `-p, --path`：代码库路径
 - `-o, --output`：报告输出路径
 - `--enable-explain`：启用 EXPLAIN 分析
@@ -135,6 +134,7 @@ analysis:
 ```
 
 说明：
+
 - `expertEnabled` 目前尚未生效（专家规则未实现）。
 - 如果 JVM 不支持 Unix Domain Socket，会自动回退到 TCP（日志会提示）。
 
@@ -143,6 +143,7 @@ analysis:
 ## 报告说明
 
 报告包含：
+
 - 扫描摘要（项目名/路径/文件数/SQL 解析率/EXPLAIN 覆盖率）
 - 严重级别分布 + 静态/EXPLAIN 问题构成
 - SQL 列表过滤（严重级别/合法性/EXPLAIN 可执行性/来源类型/规则关键词等）
