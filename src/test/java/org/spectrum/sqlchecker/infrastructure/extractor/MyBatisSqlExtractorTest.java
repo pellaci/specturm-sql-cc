@@ -270,6 +270,7 @@ class MyBatisSqlExtractorTest {
             List<String> result = extractor.extract(xml);
 
             assertThat(result).hasSize(1);
+            assertThat(normalizeSql(result.get(0))).contains("IN (1)");
         }
 
         @Test
@@ -294,6 +295,30 @@ class MyBatisSqlExtractorTest {
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0)).contains("UPDATE");
+            assertThat(result.get(0)).contains("SET");
+            assertThat(result.get(0)).doesNotContain(", WHERE");
+        }
+
+        @Test
+        @DisplayName("应该处理 trim 的 prefixOverrides")
+        void should_handle_trim_prefix_overrides() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectByStatus">
+                        SELECT * FROM users
+                        <trim prefix="WHERE" prefixOverrides="AND|OR">
+                            AND status = #{status}
+                        </trim>
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(normalizeSql(result.get(0))).contains("WHERE status = #{status}");
         }
 
         @Test
@@ -314,10 +339,10 @@ class MyBatisSqlExtractorTest {
 
             List<String> result = extractor.extract(xml);
 
-            // selectKey 和 insert 被组合成一个 SQL（这是实际行为）
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0)).contains("SELECT NEXTVAL");
-            assertThat(result.get(0)).contains("INSERT INTO users");
+            // selectKey 和 insert 会分别被提取
+            assertThat(result).hasSize(2);
+            assertThat(result).anyMatch(sql -> sql.contains("SELECT NEXTVAL"));
+            assertThat(result).anyMatch(sql -> sql.contains("INSERT INTO users"));
         }
 
         @Test
@@ -359,6 +384,74 @@ class MyBatisSqlExtractorTest {
             assertThat(result.get(0)).doesNotStartWith(" ");
             assertThat(result.get(0)).doesNotEndWith(" ");
         }
+
+        @Test
+        @DisplayName("应该解析 include 引用片段")
+        void should_resolve_include_fragments() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <sql id="Base_Column_List">
+                        id, name
+                    </sql>
+                    <select id="selectAll">
+                        <include refid="Base_Column_List"/>
+                        FROM users
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(normalizeSql(result.get(0))).contains("SELECT id, name FROM users");
+        }
+
+        @Test
+        @DisplayName("应该优先选择 choose 的第一个 when")
+        void should_pick_first_when_in_choose() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectByChoose">
+                        SELECT * FROM users
+                        <where>
+                            <choose>
+                                <when test="name != null">AND name = #{name}</when>
+                                <otherwise>AND status = 1</otherwise>
+                            </choose>
+                        </where>
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0)).contains("WHERE name = #{name}");
+            assertThat(result.get(0)).doesNotContain("status = 1");
+        }
+
+        @Test
+        @DisplayName("应该为 select 语句自动补全 SELECT 前缀")
+        void should_prefix_select_keyword_when_missing() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.UserMapper">
+                    <select id="selectColumns">
+                        id, name FROM users
+                    </select>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(normalizeSql(result.get(0))).startsWith("SELECT ");
+        }
     }
 
     // ==================== 错误处理测试 ====================
@@ -369,19 +462,20 @@ class MyBatisSqlExtractorTest {
 
         @Test
         @DisplayName("应该处理无效的 XML")
-        void should_handle_invalid_xml() {
+        void should_handle_invalid_xml() throws SqlExtractionException {
             String invalidXml = "<invalid><unclosed>";
 
-            assertThatThrownBy(() -> extractor.extract(invalidXml))
-                    .isInstanceOf(SqlExtractionException.class)
-                    .hasMessageContaining("Failed to extract SQL");
+            List<String> result = extractor.extract(invalidXml);
+
+            assertThat(result).isEmpty();
         }
 
         @Test
         @DisplayName("应该处理空输入")
-        void should_handle_empty_input() {
-            assertThatThrownBy(() -> extractor.extract(""))
-                    .isInstanceOf(SqlExtractionException.class);
+        void should_handle_empty_input() throws SqlExtractionException {
+            List<String> result = extractor.extract("");
+
+            assertThat(result).isEmpty();
         }
 
         @Test
@@ -435,5 +529,12 @@ class MyBatisSqlExtractorTest {
             // 元素名转换为小写比较
             assertThat(result).hasSize(2);
         }
+    }
+
+    private String normalizeSql(String sql) {
+        if (sql == null) {
+            return "";
+        }
+        return sql.replaceAll("\\s+", " ").trim();
     }
 }

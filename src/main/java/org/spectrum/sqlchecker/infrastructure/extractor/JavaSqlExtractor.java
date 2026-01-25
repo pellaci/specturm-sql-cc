@@ -109,20 +109,57 @@ public class JavaSqlExtractor implements SqlExtractor {
      * 检查是否是有效的 SQL
      */
     private boolean isValidSql(String sql) {
-        String upper = sql.toUpperCase().trim();
-        return upper.startsWith("SELECT")
-                || upper.startsWith("INSERT")
-                || upper.startsWith("UPDATE")
-                || upper.startsWith("DELETE")
-                || upper.startsWith("CREATE")
-                || upper.startsWith("ALTER")
-                || upper.startsWith("DROP")
-                || upper.startsWith("TRUNCATE")
-                || upper.startsWith("REPLACE")
-                || upper.startsWith("WITH")
-                || upper.startsWith("CALL")
-                || upper.startsWith("SHOW")
-                || upper.startsWith("DESC")
-                || upper.startsWith("DESCRIBE");
+        if (sql == null || sql.length() < 10) {
+            return false;
+        }
+
+        String trimmed = sql.trim();
+        String upper = trimmed.toUpperCase();
+
+        // 排除 Redis key 或缓存 key 模式 (如 "update:sku:enlandy:")
+        if (looksLikeCacheKey(trimmed)) {
+            return false;
+        }
+
+        // SQL 关键字后必须跟空白字符，表示有后续的表名/字段等
+        return matchesSqlPattern(upper, "SELECT ")
+                || matchesSqlPattern(upper, "INSERT ")
+                || matchesSqlPattern(upper, "UPDATE ")
+                || matchesSqlPattern(upper, "DELETE ")
+                || matchesSqlPattern(upper, "CREATE ")
+                || matchesSqlPattern(upper, "ALTER ")
+                || matchesSqlPattern(upper, "DROP ")
+                || matchesSqlPattern(upper, "TRUNCATE ")
+                || matchesSqlPattern(upper, "REPLACE ")
+                || matchesSqlPattern(upper, "WITH ")
+                || matchesSqlPattern(upper, "CALL ")
+                || matchesSqlPattern(upper, "SHOW ")
+                || matchesSqlPattern(upper, "DESC ")
+                || matchesSqlPattern(upper, "DESCRIBE ");
+    }
+
+    /**
+     * 检查字符串是否以指定的 SQL 关键字模式开头
+     */
+    private boolean matchesSqlPattern(String upper, String keyword) {
+        return upper.startsWith(keyword);
+    }
+
+    /**
+     * 检查是否看起来像缓存 key（如 Redis key）
+     * 缓存 key 通常是冒号分隔的标识符，如 "update:sku:enlandy:"
+     */
+    private boolean looksLikeCacheKey(String str) {
+        // 如果字符串包含冒号且没有空格，很可能是缓存 key
+        if (str.contains(":") && !str.contains(" ")) {
+            return true;
+        }
+        // 如果冒号数量超过空格数量，也可能是缓存 key 模式
+        long colonCount = str.chars().filter(ch -> ch == ':').count();
+        long spaceCount = str.chars().filter(ch -> ch == ' ').count();
+        if (colonCount > 2 && colonCount > spaceCount) {
+            return true;
+        }
+        return false;
     }
 }

@@ -1,11 +1,8 @@
 package org.spectrum.sqlchecker.cli.command;
 
-import lombok.RequiredArgsConstructor;
-import org.spectrum.sqlchecker.application.scan.ScanService;
-import org.spectrum.sqlchecker.application.scan.dto.ScanProgress;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
-// import org.springframework.stereotype.Component; // 暂时禁用，因为 ScanService 不可用
+import org.springframework.stereotype.Component;
 
 import java.io.PrintStream;
 import java.time.LocalDateTime;
@@ -15,13 +12,11 @@ import java.time.format.DateTimeFormatter;
  * 进度显示器
  *
  * @author Spectrum SQL Checker
- * @since 1.0.0
+ * @since 2.0.0
  */
-// @Component // 暂时禁用，因为 ScanService 不可用
-@RequiredArgsConstructor
+@Component
 public class ProgressDisplay {
 
-    private final ScanService scanService;
     private final PrintStream out = System.out;
     private final PrintStream err = System.err;
 
@@ -32,54 +27,61 @@ public class ProgressDisplay {
     private static final String RED = "\u001B[31m";
     private static final String BLUE = "\u001B[34m";
     private static final String CYAN = "\u001B[36m";
+    private static final String GRAY = "\u001B[90m";
 
     /**
      * 显示扫描开始信息
      */
-    public void showScanStart(Object request) {
+    public void showScanStart(String path, int totalFiles, int javaFiles, int xmlFiles, int sqlFiles) {
         out.println();
         out.println(BLUE + "╔════════════════════════════════════════════════════════════════╗" + RESET);
         out.println(BLUE + "║" + RESET + BOLD + "              SQL Checker - SQL Quality Scanner              " + RESET + BLUE + "║" + RESET);
         out.println(BLUE + "╚════════════════════════════════════════════════════════════════╝" + RESET);
         out.println();
         out.println(CYAN + "Starting scan..." + RESET);
-        out.println("  Time: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        out.println("  Path:  " + path);
+        out.println("  Files: " + totalFiles + " (" + javaFiles + " Java, " + xmlFiles + " XML, " + sqlFiles + " SQL)");
+        out.println("  Time:  " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         out.println();
     }
 
     /**
-     * 显示进度
+     * 显示扫描进度
+     *
+     * @param progress 当前进度百分比 (0-100)
+     * @param stage 当前阶段
+     * @param filesScanned 已扫描文件数
+     * @param totalFiles 总文件数
+     * @param sqlFound 已发现 SQL 数量
+     * @param currentFile 当前处理文件
      */
-    public void showProgress(String scanId) {
-        ScanProgress progress = scanService.getProgress(scanId);
-        if (progress == null) {
-            return;
-        }
-
+    public void showProgress(int progress, String stage, int filesScanned, int totalFiles, int sqlFound, String currentFile) {
         int barWidth = 40;
-        int filled = (int) (barWidth * progress.getProgress() / 100.0);
+        int filled = (int) (barWidth * progress / 100.0);
 
         out.print("\r[");
         for (int i = 0; i < barWidth; i++) {
             if (i < filled) {
                 out.print(GREEN + "█" + RESET);
             } else {
-                out.print("░");
+                out.print(GRAY + "░" + RESET);
             }
         }
-        out.print(String.format("] %d%% (%s) - %d files, %d SQL",
-                progress.getProgress(),
-                progress.getStage(),
-                progress.getFilesScanned(),
-                progress.getSqlFound()));
+        out.print(String.format("] %3d%% %s | %d/%d files | %d SQL",
+                progress, stage, filesScanned, totalFiles, sqlFound));
 
-        if (progress.getCurrentFile() != null && !progress.getCurrentFile().isEmpty()) {
-            out.print(" - " + truncate(progress.getCurrentFile(), 30));
+        if (currentFile != null && !currentFile.isEmpty()) {
+            out.print(" | " + truncate(currentFile, 25));
         }
 
-        if (progress.getStatus().isCompleted()) {
-            out.println();
-        }
+        out.flush();
+    }
+
+    /**
+     * 换行（用于进度条结束）
+     */
+    public void println() {
+        out.println();
     }
 
     /**
@@ -107,7 +109,7 @@ public class ProgressDisplay {
         out.println("  Files scanned:  " + GREEN + result.getFilesScanned() + RESET);
         out.println("  SQL found:      " + GREEN + result.getSqlFound() + RESET);
         out.println("  Unique SQL:     " + GREEN + result.getUniqueSqlFound() + RESET);
-        out.println("  Duration:       " + (result.getDurationMs() / 1000.0) + "s");
+        out.println("  Duration:       " + String.format("%.2f", result.getDurationMs() / 1000.0) + "s");
         out.println();
 
         // 问题统计
@@ -137,7 +139,7 @@ public class ProgressDisplay {
         out.println();
 
         // 错误信息
-        if (!result.getErrors().isEmpty()) {
+        if (result.getErrors() != null && !result.getErrors().isEmpty()) {
             out.println(BOLD + RED + "Errors:" + RESET);
             result.getErrors().stream()
                     .limit(5)
@@ -154,12 +156,60 @@ public class ProgressDisplay {
     }
 
     /**
+     * 显示简单扫描结果（用于 ScanCommand 的内联显示）
+     */
+    public void showSimpleResult(int totalFiles, int javaFiles, int xmlFiles, int sqlFiles, int sqlFound, int sqlParsed,
+                                  int critical, int warning, int info, long duration, String reportPath) {
+        out.println();
+        out.println("═══════════════════════════════════════════════════════════════");
+        out.println(BOLD + "Scan Results" + RESET);
+        out.println("═══════════════════════════════════════════════════════════════");
+        out.println("  Files scanned: " + totalFiles + " (" + javaFiles + " Java, " + xmlFiles + " XML, " + sqlFiles + " SQL)");
+        out.println("  SQL found:     " + sqlFound);
+        out.println("  SQL parsed:    " + sqlParsed);
+        out.println("  Duration:      " + duration + "ms");
+        out.println();
+
+        out.println(BOLD + "Issue Summary:" + RESET);
+        if (critical > 0) {
+            out.println("  " + RED + "●" + RESET + " Critical:  " + critical);
+        }
+        if (warning > 0) {
+            out.println("  " + YELLOW + "●" + RESET + " Warning:   " + warning);
+        }
+        if (info > 0) {
+            out.println("  " + CYAN + "●" + RESET + " Info:      " + info);
+        }
+        if (critical == 0 && warning == 0 && info == 0) {
+            out.println("  " + GREEN + "✅" + RESET + " No issues found!");
+        }
+        out.println();
+
+        out.println(GREEN + "📄" + RESET + " HTML report: " + reportPath);
+        out.println();
+    }
+
+    /**
      * 显示错误
      */
     public void showError(String message) {
         err.println();
         err.println(RED + "✗ Error: " + message + RESET);
         err.println();
+    }
+
+    /**
+     * 显示警告
+     */
+    public void showWarning(String message) {
+        out.println(YELLOW + "⚠ " + message + RESET);
+    }
+
+    /**
+     * 显示信息
+     */
+    public void showInfo(String message) {
+        out.println(CYAN + "ℹ " + message + RESET);
     }
 
     /**

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SQL Checker Report - {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}</title>
+    <title>SQL 检查报告 - {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}</title>
     <style>
         :root {
             --primary: #3370FF;
@@ -120,6 +120,60 @@
             gap: 16px;
         }
 
+        .overview {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .overview-score {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .overview-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .kpi-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .kpi-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .kpi-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .kpi-sub {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+
         .stat-item {
             background: var(--bg-secondary);
             border-radius: var(--radius-md);
@@ -144,6 +198,94 @@
         .stat-item.warning .stat-value { color: var(--warning); }
         .stat-item.info .stat-value { color: var(--info); }
         .stat-item.success .stat-value { color: var(--success); }
+
+        .insight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        .insight-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: 16px;
+        }
+
+        .insight-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .progress-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .progress-track {
+            height: 10px;
+            background: #E6E8EB;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 6px;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .stat-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stat-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .stat-row-label {
+            min-width: 110px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stat-row-track {
+            flex: 1;
+            height: 12px;
+            background: #FFFFFF;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .stat-row-fill {
+            height: 100%;
+            background: var(--primary);
+        }
+
+        .stat-row-value {
+            min-width: 36px;
+            text-align: right;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
 
         /* Score Badge */
         .score-badge {
@@ -421,6 +563,110 @@
             border-color: var(--primary);
         }
 
+        /* Chart Section */
+        .chart-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .chart-container {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: 20px;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .chart-canvas {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        /* Pie Chart Legend */
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* Bar Chart */
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-label {
+            min-width: 120px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 24px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 11px;
+            color: white;
+            font-weight: 600;
+            transition: width 0.3s ease;
+        }
+
+        .bar-fill.critical { background: var(--error); }
+        .bar-fill.warning { background: var(--warning); }
+        .bar-fill.info { background: var(--primary); }
+        .bar-fill.success { background: var(--success); }
+
+        .bar-value {
+            min-width: 40px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -438,6 +684,11 @@
         @media (max-width: 768px) {
             .container {
                 padding: 0 16px;
+            }
+
+            .overview {
+                grid-template-columns: 1fr;
+                text-align: center;
             }
 
             .card-body {
@@ -462,11 +713,11 @@
     <!-- Header -->
     <div class="header">
         <div class="header-content">
-            <h1>🔍 SQL Checker Report</h1>
+            <h1>🔍 SQL 检查报告</h1>
             <div class="header-meta">
-                Generated: {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}
+                生成时间: {{ summary.generatedAt | date("yyyy-MM-dd HH:mm:ss") }}
                 {% if summary.durationMs > 0 %}
-                • Scan duration: {{ (summary.durationMs / 1000) | numberFormat }}s
+                • 扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}s
                 {% endif %}
             </div>
         </div>
@@ -479,69 +730,317 @@
             <div class="card-header">
                 <div class="card-title">
                     <span class="card-icon" style="background: var(--primary-light);">📊</span>
-                    Scan Summary
+                    扫描概览
                 </div>
-                {% if summary.averageScore >= 80 %}
-                <div class="score-badge excellent">{{ summary.averageScore | numberFormat }}</div>
-                {% elseif summary.averageScore >= 60 %}
-                <div class="score-badge good">{{ summary.averageScore | numberFormat }}</div>
-                {% else %}
-                <div class="score-badge poor">{{ summary.averageScore | numberFormat }}</div>
-                {% endif %}
             </div>
             <div class="card-body">
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-value">{{ summary.totalSql }}</div>
-                        <div class="stat-label">Total SQL</div>
+                <div class="overview">
+                    <div class="overview-score">
+                        {% if summary.averageScore >= 80 %}
+                        <div class="score-badge excellent">{{ summary.averageScore | numberFormat }}</div>
+                        {% elseif summary.averageScore >= 60 %}
+                        <div class="score-badge good">{{ summary.averageScore | numberFormat }}</div>
+                        {% else %}
+                        <div class="score-badge poor">{{ summary.averageScore | numberFormat }}</div>
+                        {% endif %}
+                        <div class="overview-label">平均得分</div>
                     </div>
-                    <div class="stat-item critical">
-                        <div class="stat-value">{{ summary.criticalIssues }}</div>
-                        <div class="stat-label">Critical Issues</div>
-                    </div>
-                    <div class="stat-item warning">
-                        <div class="stat-value">{{ summary.warningIssues }}</div>
-                        <div class="stat-label">Warnings</div>
-                    </div>
-                    <div class="stat-item info">
-                        <div class="stat-value">{{ summary.infoIssues }}</div>
-                        <div class="stat-label">Info</div>
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-label">SQL 总量</div>
+                            <div class="kpi-value">{{ summary.totalSql }}</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">解析成功</div>
+                            <div class="kpi-value">{{ summary.parsedSql }}</div>
+                            <div class="kpi-sub">{{ summary.parseRate | numberFormat }}% 解析率</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">可执行 EXPLAIN</div>
+                            <div class="kpi-value">{{ summary.explainEligible }}</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">已执行 EXPLAIN</div>
+                            <div class="kpi-value">{{ summary.explainExecuted }}</div>
+                            <div class="kpi-sub">{{ summary.explainCoverage | numberFormat }}% 覆盖率</div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-label">问题总量</div>
+                            <div class="kpi-value">{{ summary.totalIssues }}</div>
+                            <div class="kpi-sub">
+                                严重 {{ summary.criticalIssues }} · 警告 {{ summary.warningIssues }} · 提示 {{ summary.infoIssues }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Coverage & Distribution -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-icon" style="background: var(--primary-light);">🧭</span>
+                    覆盖率与分布
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="insight-grid">
+                    <div class="insight-card">
+                        <div class="insight-title">解析与 EXPLAIN 覆盖率</div>
+                        <div class="progress-group">
+                            <div>
+                                <div class="progress-label">
+                                    <span>解析覆盖率</span>
+                                    <span>{{ summary.parsedSql }}/{{ summary.totalSql }}</span>
+                                </div>
+                                <div class="progress-track">
+                                    <div class="progress-fill" style="width: {{ summary.parseRate | numberFormat }}%;"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="progress-label">
+                                    <span>EXPLAIN 覆盖率</span>
+                                    <span>{{ summary.explainExecuted }}/{{ summary.explainEligible }}</span>
+                                </div>
+                                <div class="progress-track">
+                                    <div class="progress-fill" style="width: {{ summary.explainCoverage | numberFormat }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">SQL 分类</div>
+                        <div class="stat-list">
+                            {% if summary.categoryStats is empty %}
+                            <div class="stat-row-label">暂无数据</div>
+                            {% else %}
+                            {% for item in summary.categoryStats %}
+                            <div class="stat-row">
+                                <div class="stat-row-label">{{ item.label }}</div>
+                                <div class="stat-row-track">
+                                    <div class="stat-row-fill" style="width: {{ item.ratio | numberFormat }}%;"></div>
+                                </div>
+                                <div class="stat-row-value">{{ item.count }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">EXPLAIN 可执行性</div>
+                        <div class="stat-list">
+                            {% if summary.explainEligibilityStats is empty %}
+                            <div class="stat-row-label">暂无数据</div>
+                            {% else %}
+                            {% for item in summary.explainEligibilityStats %}
+                            <div class="stat-row">
+                                <div class="stat-row-label">{{ item.label }}</div>
+                                <div class="stat-row-track">
+                                    <div class="stat-row-fill" style="width: {{ item.ratio | numberFormat }}%;"></div>
+                                </div>
+                                <div class="stat-row-value">{{ item.count }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">SQL 来源类型</div>
+                        <div class="stat-list">
+                            {% if summary.sourceTypeStats is empty %}
+                            <div class="stat-row-label">暂无数据</div>
+                            {% else %}
+                            {% for item in summary.sourceTypeStats %}
+                            <div class="stat-row">
+                                <div class="stat-row-label">{{ item.label }}</div>
+                                <div class="stat-row-track">
+                                    <div class="stat-row-fill" style="width: {{ item.ratio | numberFormat }}%;"></div>
+                                </div>
+                                <div class="stat-row-value">{{ item.count }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">合法性</div>
+                        <div class="stat-list">
+                            {% if summary.validityStats is empty %}
+                            <div class="stat-row-label">暂无数据</div>
+                            {% else %}
+                            {% for item in summary.validityStats %}
+                            <div class="stat-row">
+                                <div class="stat-row-label">{{ item.label }}</div>
+                                <div class="stat-row-track">
+                                    <div class="stat-row-fill" style="width: {{ item.ratio | numberFormat }}%;"></div>
+                                </div>
+                                <div class="stat-row-value">{{ item.count }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issue Hotspots -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-icon" style="background: var(--primary-light);">🔥</span>
+                    问题热点
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="insight-grid">
+                    <div class="insight-card">
+                        <div class="insight-title">静态规则</div>
+                        <div class="stat-list">
+                            {% if summary.staticIssueStats is empty %}
+                            <div class="stat-row-label">暂无静态问题</div>
+                            {% else %}
+                            {% for item in summary.staticIssueStats %}
+                            <div class="stat-row">
+                                <div class="stat-row-label">{{ item.label }}</div>
+                                <div class="stat-row-track">
+                                    <div class="stat-row-fill" style="width: {{ item.ratio | numberFormat }}%;"></div>
+                                </div>
+                                <div class="stat-row-value">{{ item.count }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-title">EXPLAIN 规则</div>
+                        <div class="stat-list">
+                            {% if summary.explainIssueStats is empty %}
+                            <div class="stat-row-label">暂无 EXPLAIN 问题</div>
+                            {% else %}
+                            {% for item in summary.explainIssueStats %}
+                            <div class="stat-row">
+                                <div class="stat-row-label">{{ item.label }}</div>
+                                <div class="stat-row-track">
+                                    <div class="stat-row-fill" style="width: {{ item.ratio | numberFormat }}%;"></div>
+                                </div>
+                                <div class="stat-row-value">{{ item.count }}</div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        {% if summary.totalIssues > 0 %}
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span class="card-icon" style="background: var(--primary-light);">📈</span>
+                    问题分布
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-section">
+                    <!-- Pie Chart -->
+                    <div class="chart-container">
+                        <div class="chart-title">严重程度分布</div>
+                        <canvas id="pieChart" class="chart-canvas" width="200" height="200"></canvas>
+                        <div class="chart-legend">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--error);"></div>
+                                <span>严重 ({{ summary.criticalIssues }})</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--warning);"></div>
+                                <span>警告 ({{ summary.warningIssues }})</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--primary);"></div>
+                                <span>提示 ({{ summary.infoIssues }})</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bar Chart -->
+                    <div class="chart-container">
+                        <div class="chart-title">问题构成</div>
+                        <div class="bar-chart" id="barChart">
+                            {% if summary.criticalIssues > 0 %}
+                            <div class="bar-item">
+                                <div class="bar-label">严重</div>
+                                <div class="bar-track">
+                                    <div class="bar-fill critical" style="width: {{ (summary.criticalIssues * 100 / summary.totalIssues) | numberFormat }}%;">
+                                        {{ (summary.criticalIssues * 100 / summary.totalIssues) | numberFormat }}%
+                                    </div>
+                                </div>
+                                <div class="bar-value">{{ summary.criticalIssues }}</div>
+                            </div>
+                            {% endif %}
+                            {% if summary.warningIssues > 0 %}
+                            <div class="bar-item">
+                                <div class="bar-label">警告</div>
+                                <div class="bar-track">
+                                    <div class="bar-fill warning" style="width: {{ (summary.warningIssues * 100 / summary.totalIssues) | numberFormat }}%;">
+                                        {{ (summary.warningIssues * 100 / summary.totalIssues) | numberFormat }}%
+                                    </div>
+                                </div>
+                                <div class="bar-value">{{ summary.warningIssues }}</div>
+                            </div>
+                            {% endif %}
+                            {% if summary.infoIssues > 0 %}
+                            <div class="bar-item">
+                                <div class="bar-label">提示</div>
+                                <div class="bar-track">
+                                    <div class="bar-fill info" style="width: {{ (summary.infoIssues * 100 / summary.totalIssues) | numberFormat }}%;">
+                                        {{ (summary.infoIssues * 100 / summary.totalIssues) | numberFormat }}%
+                                    </div>
+                                </div>
+                                <div class="bar-value">{{ summary.infoIssues }}</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- SQL List -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">
                     <span class="card-icon" style="background: var(--primary-light);">📝</span>
-                    SQL Statements ({{ sqlStatements | length }})
+                    SQL 语句列表 ({{ sqlStatements | length }})
                 </div>
             </div>
             <div class="card-body">
                 <div class="filters">
-                    <button class="filter-btn active" onclick="filterBySeverity('all')">All</button>
-                    <button class="filter-btn" onclick="filterBySeverity('critical')">Critical</button>
-                    <button class="filter-btn" onclick="filterBySeverity('warning')">Warning</button>
-                    <button class="filter-btn" onclick="filterBySeverity('info')">Info</button>
+                    <button class="filter-btn active" onclick="filterBySeverity('all')">全部</button>
+                    <button class="filter-btn" onclick="filterBySeverity('critical')">严重</button>
+                    <button class="filter-btn" onclick="filterBySeverity('warning')">警告</button>
+                    <button class="filter-btn" onclick="filterBySeverity('info')">提示</button>
                 </div>
 
                 {% if sqlStatements is empty %}
                 <div class="empty-state">
                     <div class="empty-icon">✓</div>
-                    <p>No SQL statements found</p>
+                    <p>未发现 SQL 语句</p>
                 </div>
                 {% else %}
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th style="width: 80px;">Severity</th>
-                                <th style="width: 80px;">Score</th>
-                                <th>Abstract SQL</th>
-                                <th style="width: 100px;">Locations</th>
-                                <th style="width: 80px;">Details</th>
+                                <th style="width: 80px;">严重级别</th>
+                                <th style="width: 80px;">评分</th>
+                                <th>SQL 语句</th>
+                                <th style="width: 120px;">位置</th>
+                                <th style="width: 80px;">详情</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -550,7 +1049,9 @@
                                 <td>
                                     <span class="severity-badge {{ sql.severity | lower }}">
                                         <span class="severity-dot"></span>
-                                        {{ sql.severity }}
+                                        {% if sql.severity == 'CRITICAL' %}严重
+                                        {% elseif sql.severity == 'WARNING' %}警告
+                                        {% else %}提示{% endif %}
                                     </span>
                                 </td>
                                 <td>
@@ -560,7 +1061,7 @@
                                     <div class="sql-code">{{ sql.abstractSql }}</div>
                                     {% if sql.originalSql != sql.abstractSql %}
                                     <details style="margin-top: 8px;">
-                                        <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">View Original SQL</summary>
+                                        <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">查看原始 SQL</summary>
                                         <div class="sql-code" style="margin-top: 8px;">{{ sql.originalSql }}</div>
                                     </details>
                                     {% endif %}
@@ -571,7 +1072,7 @@
                                     {% endfor %}
                                 </td>
                                 <td>
-                                    <button class="filter-btn" onclick="toggleDetails('{{ sql.id }}')">View</button>
+                                    <button class="filter-btn" onclick="toggleDetails('{{ sql.id }}')">查看</button>
                                 </td>
                             </tr>
 
@@ -579,10 +1080,34 @@
                             <tr id="details-{{ sql.id }}" style="display: none;">
                                 <td colspan="5" style="padding: 0;">
                                     <div style="padding: 20px; background: var(--bg-secondary);">
+                                        <!-- Preprocess Info -->
+                                        <h4 style="margin-bottom: 12px;">🧹 预处理信息</h4>
+                                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+                                            分类: {{ sql.category }} |
+                                            合法性: {{ sql.validity }} |
+                                            Explain 可执行性: {{ sql.explainEligibility }}
+                                        </div>
+                                        {% if sql.preprocessErrorReason %}
+                                        <div style="font-size: 12px; color: var(--warning); margin-bottom: 8px;">
+                                            {{ sql.preprocessErrorReason }}
+                                        </div>
+                                        {% endif %}
+                                        {% if sql.normalizedSql %}
+                                        <details style="margin-bottom: 8px;">
+                                            <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">查看规范化 SQL</summary>
+                                            <div class="sql-code" style="margin-top: 8px;">{{ sql.normalizedSql }}</div>
+                                        </details>
+                                        {% endif %}
+                                        {% if sql.explainSql %}
+                                        <details style="margin-bottom: 12px;">
+                                            <summary style="cursor: pointer; color: var(--primary); font-size: 12px;">查看 Explain SQL</summary>
+                                            <div class="sql-code" style="margin-top: 8px;">{{ sql.explainSql }}</div>
+                                        </details>
+                                        {% endif %}
                                         <!-- Static Analysis -->
-                                        {% if sql.staticAnalysis %}
-                                        <h4 style="margin-bottom: 12px;">📋 Static Analysis</h4>
-                                        {% if sql.staticAnalysis.issues is not empty %}
+                                        {% if sql.staticAnalysis is defined and sql.staticAnalysis is not null %}
+                                        <h4 style="margin-bottom: 12px;">📋 静态分析结果</h4>
+                                        {% if sql.staticAnalysis.issues is defined and sql.staticAnalysis.issues is not null and sql.staticAnalysis.issues.size() > 0 %}
                                         <ul class="issue-list">
                                             {% for issue in sql.staticAnalysis.issues %}
                                             <li class="issue-item">
@@ -597,14 +1122,22 @@
                                             {% endfor %}
                                         </ul>
                                         {% else %}
-                                        <p style="color: var(--text-secondary);">No static issues found.</p>
+                                        <p style="color: var(--text-secondary);">未发现问题</p>
                                         {% endif %}
+                                        {% else %}
+                                        <h4 style="margin-bottom: 12px;">📋 静态分析结果</h4>
+                                        <p style="color: var(--text-secondary);">未发现问题</p>
                                         {% endif %}
 
                                         <!-- EXPLAIN Analysis -->
-                                        {% if sql.explainAnalysis %}
-                                        <h4 style="margin: 20px 0 12px;">📊 EXPLAIN Analysis</h4>
-                                        {% if sql.explainAnalysis.plan %}
+                                        {% if sql.explainEligibility is defined and sql.explainEligibility == 'NOT_SUPPORTED' %}
+                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <p style="color: var(--text-secondary);">
+                                            已跳过: {{ sql.explainEligibility }}
+                                            {% if sql.preprocessErrorReason %} ({{ sql.preprocessErrorReason }}){% endif %}
+                                        </p>
+                                        {% elseif sql.explainAnalysis is defined and sql.explainAnalysis is not null and sql.explainAnalysis.plan is defined and sql.explainAnalysis.plan is not null %}
+                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
                                         <div class="explain-plan">
                                             {% for node in sql.explainAnalysis.plan.nodes %}
                                             <div class="explain-node {{ node.id == '1' ? 'root' : '' }}">
@@ -614,10 +1147,10 @@
                                                 <span> | </span>
                                                 <span class="explain-table">{{ node.table }}</span>
                                                 {% if node.key %}
-                                                <span> | Key: {{ node.key }}</span>
+                                                <span> | 索引: {{ node.key }}</span>
                                                 {% endif %}
                                                 {% if node.rows %}
-                                                <span> | Rows: {{ node.rows }}</span>
+                                                <span> | 扫描行数: {{ node.rows }}</span>
                                                 {% endif %}
                                                 {% if node.extra %}
                                                 <div style="color: var(--text-secondary); margin-top: 4px;">{{ node.extra }}</div>
@@ -625,8 +1158,7 @@
                                             </div>
                                             {% endfor %}
                                         </div>
-                                        {% endif %}
-                                        {% if sql.explainAnalysis.issues is not empty %}
+                                        {% if sql.explainAnalysis.issues is defined and sql.explainAnalysis.issues is not null and sql.explainAnalysis.issues.size() > 0 %}
                                         <ul class="issue-list" style="margin-top: 12px;">
                                             {% for issue in sql.explainAnalysis.issues %}
                                             <li class="issue-item">
@@ -641,12 +1173,17 @@
                                             {% endfor %}
                                         </ul>
                                         {% endif %}
+                                        {% elseif sql.explainAnalysis is defined and sql.explainAnalysis is not null %}
+                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <p style="color: var(--text-secondary);">动态分析需要配置数据库连接，当前未启用</p>
+                                        {% else %}
+                                        <h4 style="margin: 20px 0 12px;">📊 执行计划分析 (EXPLAIN)</h4>
+                                        <p style="color: var(--text-secondary);">动态分析需要配置数据库连接，当前未启用</p>
                                         {% endif %}
 
                                         <!-- Expert Analysis -->
-                                        {% if sql.expertAnalysis %}
-                                        <h4 style="margin: 20px 0 12px;">🎯 Expert Recommendations</h4>
-                                        {% if sql.expertAnalysis.recommendations is not empty %}
+                                        {% if sql.expertAnalysis is defined and sql.expertAnalysis is not null and sql.expertAnalysis.recommendations is defined and sql.expertAnalysis.recommendations is not null and sql.expertAnalysis.recommendations.size() > 0 %}
+                                        <h4 style="margin: 20px 0 12px;">🎯 专家建议</h4>
                                         <ul class="issue-list">
                                             {% for rec in sql.expertAnalysis.recommendations %}
                                             <li class="issue-item">
@@ -665,7 +1202,9 @@
                                             {% endfor %}
                                         </ul>
                                         {% else %}
-                                        <p style="color: var(--text-secondary);">No recommendations.</p>
+                                        {% if sql.expertAnalysis is defined and sql.expertAnalysis is not null %}
+                                        <h4 style="margin: 20px 0 12px;">🎯 专家建议</h4>
+                                        <p style="color: var(--text-secondary);">暂无建议</p>
                                         {% endif %}
                                         {% endif %}
                                     </div>
@@ -682,11 +1221,79 @@
 
     <!-- Footer -->
     <div class="footer">
-        <p>Generated by <strong>SQL Checker</strong> v1.0.0</p>
-        <p style="margin-top: 4px;">Scan time: {{ (summary.durationMs / 1000) | numberFormat }}s</p>
+        <p>由 <strong>SQL Checker</strong> 生成 | v1.0.0</p>
+        <p style="margin-top: 4px;">扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}秒</p>
     </div>
 
     <script>
+        // Chart data from template
+        const chartData = {
+            critical: {{ summary.criticalIssues }},
+            warning: {{ summary.warningIssues }},
+            info: {{ summary.infoIssues }},
+            total: {{ summary.totalIssues }}
+        };
+
+        // Draw pie chart
+        function drawPieChart() {
+            const canvas = document.getElementById('pieChart');
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 10;
+
+            const data = [
+                { value: chartData.critical, color: '#F54A45', label: 'Critical' },
+                { value: chartData.warning, color: '#FF8800', label: 'Warning' },
+                { value: chartData.info, color: '#3370FF', label: 'Info' }
+            ].filter(d => d.value > 0);
+
+            if (data.length === 0) {
+                // Draw empty state
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#DEE0E3';
+                ctx.fill();
+                return;
+            }
+
+            const total = data.reduce((sum, d) => sum + d.value, 0);
+            let startAngle = -Math.PI / 2;
+
+            data.forEach(item => {
+                const sliceAngle = (item.value / total) * 2 * Math.PI;
+
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = item.color;
+                ctx.fill();
+
+                // Add white border between slices
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                startAngle += sliceAngle;
+            });
+
+            // Draw center circle (donut chart style)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius * 0.5, 0, 2 * Math.PI);
+            ctx.fillStyle = '#F5F6F7';
+            ctx.fill();
+
+            // Draw total in center
+            ctx.fillStyle = '#1F2329';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(total.toString(), centerX, centerY);
+        }
+
         // Toggle details
         function toggleDetails(id) {
             const row = document.getElementById('details-' + id);
@@ -721,6 +1328,11 @@
             header.addEventListener('click', () => {
                 header.parentElement.classList.toggle('expanded');
             });
+        });
+
+        // Initialize charts on page load
+        window.addEventListener('load', () => {
+            drawPieChart();
         });
     </script>
 </body>

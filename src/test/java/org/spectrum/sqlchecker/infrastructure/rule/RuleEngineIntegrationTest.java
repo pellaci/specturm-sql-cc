@@ -3,6 +3,7 @@ package org.spectrum.sqlchecker.infrastructure.rule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.spectrum.sqlchecker.cli.SqlCheckerApplication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -12,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 规则引擎集成测试
  * 验证所有规则是否正确注册
  */
-@SpringBootTest
+@SpringBootTest(classes = SqlCheckerApplication.class, properties = "sqlchecker.cli.enabled=false")
 @DisplayName("规则引擎集成测试")
 class RuleEngineIntegrationTest {
 

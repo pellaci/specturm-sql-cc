@@ -34,6 +34,25 @@ public class ConnectionManager {
     }
 
     /**
+     * 获取连接配置
+     *
+     * @param name 连接名称
+     * @return 连接配置，不存在时返回 null
+     */
+    public ConnectionConfig getConfig(String name) {
+        return connections.get(name);
+    }
+
+    /**
+     * 获取所有已注册的连接名称
+     *
+     * @return 连接名称集合
+     */
+    public java.util.Set<String> getRegisteredConnections() {
+        return connections.keySet();
+    }
+
+    /**
      * 获取连接
      *
      * @param name 连接名称
@@ -127,6 +146,7 @@ public class ConnectionManager {
         private String username;
         private String password;
         private String charset = "utf8mb4";
+        private String jdbcUrl;
         private Map<String, String> parameters = new ConcurrentHashMap<>();
 
         public String getDriverClassName() {
@@ -139,6 +159,9 @@ public class ConnectionManager {
         }
 
         public String getJdbcUrl() {
+            if (jdbcUrl != null && !jdbcUrl.isBlank()) {
+                return jdbcUrl;
+            }
             StringBuilder sb = new StringBuilder();
             sb.append("jdbc:").append(type).append("://");
             sb.append(host).append(":").append(port);
@@ -176,6 +199,8 @@ public class ConnectionManager {
         public void setPassword(String password) { this.password = password; }
         public String getCharset() { return charset; }
         public void setCharset(String charset) { this.charset = charset; }
+        public String getJdbcUrlOverride() { return jdbcUrl; }
+        public void setJdbcUrlOverride(String jdbcUrl) { this.jdbcUrl = jdbcUrl; }
         public Map<String, String> getParameters() { return parameters; }
         public void setParameters(Map<String, String> parameters) { this.parameters = parameters; }
     }

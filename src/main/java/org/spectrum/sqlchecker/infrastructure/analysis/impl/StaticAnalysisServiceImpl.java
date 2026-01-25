@@ -56,7 +56,7 @@ public class StaticAnalysisServiceImpl implements StaticAnalysisService {
         if (upperSql.matches(".*LIKE\\s+['\"]%.*")) {
             issues.add(StaticIssue.builder()
                     .type(IssueType.LIKE_LEADING_WILDCARD)
-                    .severity(SeverityLevel.CRITICAL)
+                    .severity(SeverityLevel.WARNING)
                     .message("LIKE 以通配符开头无法使用索引")
                     .suggestion("考虑使用全文索引或反向索引")
                     .build());

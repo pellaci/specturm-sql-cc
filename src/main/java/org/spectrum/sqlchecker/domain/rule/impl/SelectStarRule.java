@@ -2,7 +2,9 @@ package org.spectrum.sqlchecker.domain.rule.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.statement.select.AllColumns;
+import net.sf.jsqlparser.statement.select.AllTableColumns;
 import net.sf.jsqlparser.statement.select.PlainSelect;
+import net.sf.jsqlparser.statement.select.SelectItem;
 import org.spectrum.sqlchecker.domain.rule.RuleContext;
 import org.spectrum.sqlchecker.domain.rule.RuleIssue;
 import org.spectrum.sqlchecker.domain.rule.RuleLocation;
@@ -30,7 +32,7 @@ import java.util.Set;
         name = "Avoid SELECT *",
         description = "使用 SELECT * 会查询所有列，可能造成不必要的 I/O 和网络开销",
         type = RuleType.PROBLEM,
-        severity = SeverityLevel.CRITICAL,
+        severity = SeverityLevel.WARNING,
         tags = {"performance", "readability"},
         category = RuleCategory.PERFORMANCE
 )
@@ -65,7 +67,11 @@ public class SelectStarRule implements SqlRule {
 
         // 检查是否包含 AllColumns (即 *)
         boolean hasStar = select.getSelectItems().stream()
-                .anyMatch(AllColumns.class::isInstance);
+                .anyMatch(item -> {
+                    SelectItem<?> selectItem = item;
+                    Object expression = selectItem.getExpression();
+                    return expression instanceof AllColumns || expression instanceof AllTableColumns;
+                });
 
         if (hasStar) {
             reportAllColumns(context);

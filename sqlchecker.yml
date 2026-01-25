@@ -6,14 +6,15 @@ database:
     default:
       name: Default MySQL
       type: mysql
-      host: localhost
+      host: 127.0.0.1
       port: 3306
-      database: your_database
-      username: your_username
-      password: your_password
+      database: ssqlchecker
+      username: spec
+      password: spec123
       parameters:
         useSSL: false
         serverTimezone: UTC
+        unix_socket: /tmp/mysql.sock
 
 # Scan settings
 scan:
@@ -36,6 +37,9 @@ analysis:
   expertEnabled: true
   timeoutSeconds: 30
   maxThreads: 4
+  thresholds:
+    explain-timeout: 30
+    scan-rows: 10000
 
 # Report settings
 report:

@@ -103,10 +103,11 @@ graph TB
         E1 --> F[SQL 合并器]
         E2 --> F
         E3 --> F
+        F --> P[SQL 预处理器]
     end
 
     subgraph "分析管道"
-        F --> G[分析调度器]
+        P --> G[分析调度器]
         G --> H1[静态分析引擎]
         G --> H2[动态 EXPLAIN 引擎]
         G --> H3[专家规则引擎]
@@ -211,6 +212,24 @@ classDiagram
     SqlExtractor <|.. JpaAnnotationExtractor
     SqlExtractor <|.. StringLiteralExtractor
 ```
+
+**补充决策：SQL 预处理与 Explain 适配**
+
+**背景**
+- EXPLAIN 需要可执行 SQL，但扫描得到的 SQL 往往包含占位符、动态片段或不完整结构
+- MyBatis 动态 SQL、字符串拼接在解析阶段容易产生不可执行模板
+
+**决策**
+在提取与分析之间新增 **SQL 预处理阶段**，完成：
+1) SQL 分类（来源/结构）
+2) 合法性校验（JSqlParser 解析）
+3) 规范化/格式化（空白与关键字统一）
+4) Explain 适配（安全替换占位符与动态结构兜底）
+
+**后果**
+- 正面：Explain 可执行率显著提升，失败原因可追踪
+- 正面：MyBatis/字符串拼接具备专项修复策略
+- 负面：增加一次处理步骤与持久化开销（可接受）
 
 ---
 
@@ -570,6 +589,7 @@ flowchart TB
             AnnotationExtractor[注解提取器]
             StringExtractor[字符串提取器]
             Deduplicator[SQL 去重器]
+            Preprocessor[SQL 预处理器]
         end
 
         subgraph "分析域"
@@ -596,8 +616,8 @@ flowchart TB
     XmlExtractor --> Deduplicator
     AnnotationExtractor --> Deduplicator
     StringExtractor --> Deduplicator
-
-    Deduplicator --> Coordinator
+    Deduplicator --> Preprocessor
+    Preprocessor --> Coordinator
     Coordinator --> StaticAnalyzer
     Coordinator --> ExplainEngine
     Coordinator --> ExpertEngine
@@ -624,12 +644,16 @@ org.spectrum.sqlchecker
 │   └── shell                  # 交互式 Shell
 ├── application                # 应用服务层
 │   ├── scan                   # 扫描编排
+│   ├── preprocess             # SQL 预处理
 │   ├── analysis               # 分析协调
 │   └── report                 # 报告生成
 ├── domain                     # 领域层
 │   ├── scanner                # 扫描域
 │   │   ├── model              # 领域模型
 │   │   ├── extractor          # SQL 提取器
+│   │   └── service            # 领域服务
+│   ├── preprocess             # 预处理域
+│   │   ├── model              # 领域模型
 │   │   └── service            # 领域服务
 │   ├── analysis               # 分析域
 │   │   ├── model              # 领域模型
@@ -666,11 +690,14 @@ org.spectrum.sqlchecker
 
 ### 6.1 核心领域模型映射
 
+为支持 Explain 适配与失败原因追踪，引入 `SQL_PREPROCESS_RESULT` 用于记录分类、规范化 SQL 与 Explain SQL。
+
 ```mermaid
 erDiagram
     CODE_REPOSITORY ||--o{ SOURCE_FILE : contains
     SOURCE_FILE ||--o{ SQL_STATEMENT : contains
     SQL_STATEMENT ||--|| SQL_LOCATION : has
+    SQL_STATEMENT ||--o{ SQL_PREPROCESS_RESULT : preprocesses
     SQL_STATEMENT ||--o{ ANALYSIS_RESULT : produces
     ANALYSIS_RESULT ||--|| STATIC_ANALYSIS : has
     ANALYSIS_RESULT ||--|| EXPLAIN_ANALYSIS : has
@@ -712,6 +739,18 @@ erDiagram
         int column
         string class_name
         string method_name
+    }
+
+    SQL_PREPROCESS_RESULT {
+        string id PK
+        string sql_id FK
+        string category
+        string normalized_sql
+        string explain_sql
+        string validity
+        string explain_eligibility
+        string error_reason
+        timestamp created_at
     }
 
     ANALYSIS_RESULT {
@@ -826,6 +865,22 @@ CREATE TABLE sql_location (
     method_name VARCHAR(255),
     FOREIGN KEY (sql_id) REFERENCES sql_statement(id),
     INDEX idx_sql (sql_id)
+);
+
+-- SQL 预处理结果表
+CREATE TABLE sql_preprocess_result (
+    id VARCHAR(36) PRIMARY KEY,
+    sql_id VARCHAR(36) NOT NULL,
+    category VARCHAR(64) NOT NULL,
+    normalized_sql TEXT NOT NULL,
+    explain_sql TEXT,
+    validity VARCHAR(16) NOT NULL,
+    explain_eligibility VARCHAR(16) NOT NULL,
+    error_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sql_id) REFERENCES sql_statement(id),
+    INDEX idx_preprocess_sql (sql_id),
+    INDEX idx_preprocess_category (category)
 );
 ```
 

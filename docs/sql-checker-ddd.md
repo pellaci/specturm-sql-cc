@@ -15,11 +15,12 @@
 
 ## 文档说明
 
-本文档是对 Spectrum SQL Checker MVP 版本的详细设计，涵盖以下 6 个核心功能模块：
+本文档是对 Spectrum SQL Checker MVP 版本的详细设计，涵盖以下 7 个核心功能模块：
 
 | 模块编号 | 模块名称 | 对应需求 |
 |----------|----------|----------|
 | M-001 | 扫描模块 | REQ-001 代码库扫描与 SQL 提取 |
+| M-001A | SQL 预处理与 Explain 适配 | REQ-001 / REQ-003 |
 | M-002 | 静态分析模块 | REQ-002 静态 SQL 分析 |
 | M-003 | 动态分析模块 | REQ-003 动态 EXPLAIN 分析 |
 | M-004 | 专家规则模块 | REQ-004 专家规则分析 |
@@ -1334,6 +1335,252 @@ sequenceDiagram
 |----------|------|
 | 直接调用 | CLI 通过 Spring Boot Application 上下文直接调用服务 |
 | 异步事件 | 扫描进度通过事件机制通知 CLI 更新 |
+
+---
+
+# 模块 M-001A：SQL 预处理与 Explain 适配
+
+## 1. 功能概述
+
+### 1.1 功能描述
+
+在 SQL 提取完成后、进入静态/动态分析前，执行 **SQL 分类 / 合法性校验 / 规范化 / Explain 适配**，确保进入 EXPLAIN 的 SQL 可执行，并对 MyBatis 动态 SQL、字符串拼接等场景提供专项修复策略。
+
+### 1.2 用户场景
+
+```
+场景：开发工程师启用 --enable-explain 扫描项目
+前置条件：已提取原始 SQL 语句
+后置条件：生成可执行 Explain SQL 或明确不可执行原因
+```
+
+### 1.3 前置/后置条件
+
+| 条件类型 | 说明 |
+|----------|------|
+| 前置条件 | SQL 已提取，具备来源信息与原始文本 |
+| 后置条件 | 生成预处理结果（分类、规范化 SQL、Explain SQL、失败原因） |
+
+---
+
+## 2. 接口设计
+
+### 2.1 应用服务接口
+
+```java
+package org.spectrum.sqlchecker.application.preprocess;
+
+import org.spectrum.sqlchecker.application.preprocess.dto.*;
+
+public interface SqlPreprocessService {
+    PreprocessResult preprocess(PreprocessRequest request);
+}
+```
+
+### 2.2 DTO 定义
+
+```java
+public class PreprocessRequest {
+    private String sqlId;
+    private String originalSql;
+    private SqlSourceType sourceType;
+    private String sourceContext;
+    private boolean explainEnabled;
+}
+
+public class PreprocessResult {
+    private String sqlId;
+    private SqlCategory category;
+    private String normalizedSql;
+    private String explainSql;
+    private ValidityStatus validity;
+    private ExplainEligibility explainEligibility;
+    private String errorReason;
+}
+```
+
+### 2.3 枚举类型
+
+```java
+public enum SqlCategory {
+    MYBATIS_XML_STATIC,
+    MYBATIS_XML_DYNAMIC,
+    MYBATIS_ANNOTATION,
+    JPA_NATIVE_QUERY,
+    STRING_CONCAT,
+    PLACEHOLDER_TEMPLATE,
+    UNKNOWN
+}
+
+public enum ValidityStatus { VALID, INVALID, UNKNOWN }
+public enum ExplainEligibility { SUPPORTED, NOT_SUPPORTED, SKIPPED }
+```
+
+---
+
+## 3. 数据库设计
+
+新增 SQL 预处理结果表，记录分类、规范化 SQL 与 Explain SQL：
+
+```sql
+CREATE TABLE sql_preprocess_result (
+    id VARCHAR(64) PRIMARY KEY,
+    sql_id VARCHAR(64) NOT NULL,
+    category VARCHAR(64) NOT NULL,
+    normalized_sql TEXT NOT NULL,
+    explain_sql TEXT,
+    validity VARCHAR(16) NOT NULL,
+    explain_eligibility VARCHAR(16) NOT NULL,
+    error_reason TEXT,
+    created_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (sql_id) REFERENCES sql_statement(id)
+);
+
+CREATE INDEX idx_preprocess_sql_id ON sql_preprocess_result(sql_id);
+CREATE INDEX idx_preprocess_category ON sql_preprocess_result(category);
+```
+
+---
+
+## 4. 领域模型设计
+
+### 4.1 实体
+
+- `SqlPreprocessResult`：存储 SQL 分类、规范化 SQL、Explain SQL 与失败原因
+
+### 4.2 值对象
+
+- `SqlCategory`、`NormalizedSql`、`ExplainSql`、`ValidityStatus`、`ExplainEligibility`
+
+### 4.3 领域服务
+
+- `SqlClassifier`、`SqlNormalizer`、`SqlValidator`
+- `ExplainSqlBuilder`、`MyBatisSqlFixer`、`StringConcatSqlFixer`
+
+### 4.4 Repository 接口
+
+```java
+public interface SqlPreprocessResultRepository {
+    void save(SqlPreprocessResult result);
+    Optional<SqlPreprocessResult> findBySqlId(String sqlId);
+}
+```
+
+---
+
+## 5. 应用服务设计
+
+### 5.1 处理流程
+
+1) 分类（基于来源类型与结构特征）  
+2) 合法性校验（JSqlParser 解析）  
+3) 规范化（统一空白/关键字/注释）  
+4) Explain 适配（占位符替换、IN/LIKE 处理、动态 SQL 兜底）  
+5) 结果落库（`sql_preprocess_result`）
+
+### 5.2 伪代码
+
+```java
+public PreprocessResult preprocess(PreprocessRequest request) {
+    SqlCategory category = classifier.classify(request);
+    String candidateSql = normalizer.normalize(request.getOriginalSql());
+
+    ValidationResult parsed = validator.validate(candidateSql);
+    if (!parsed.isValid()) {
+        candidateSql = fixerRegistry.applyFixers(category, candidateSql);
+        parsed = validator.validate(candidateSql);
+    }
+
+    String explainSql = null;
+    ExplainEligibility eligibility = ExplainEligibility.SKIPPED;
+    if (request.isExplainEnabled()) {
+        ExplainBuildResult build = explainBuilder.build(candidateSql, category);
+        explainSql = build.getExplainSql();
+        eligibility = build.getEligibility();
+    }
+
+    return resultFactory.create(request, category, candidateSql, explainSql, parsed, eligibility);
+}
+```
+
+---
+
+## 6. 集成与流程调整
+
+### 6.1 CLI 调用路径
+
+`ScanCommand` 在提取 SQL 后调用 `SqlPreprocessService`，并将结果写入 `SqlPreprocessResultRepository`。
+
+### 6.2 主要调整点
+
+- 在 **SQL 提取 -> 分析** 之间新增 “预处理与 Explain 适配” 步骤
+- EXPLAIN 引擎仅使用 `explain_sql`
+- 报告展示 `normalized_sql` 与 `explain_eligibility`
+
+---
+
+## 7. 时序图
+
+```mermaid
+sequenceDiagram
+    participant CLI as ScanCommand
+    participant Extractor as SqlExtractor
+    participant Preprocess as SqlPreprocessService
+    participant Explain as ExplainEngine
+
+    CLI->>Extractor: extract()
+    Extractor-->>CLI: SqlStatement list
+    CLI->>Preprocess: preprocess(sql)
+    Preprocess-->>CLI: PreprocessResult
+    alt explain supported
+        CLI->>Explain: analyze(explainSql)
+        Explain-->>CLI: ExplainAnalysis
+    end
+```
+
+---
+
+## 8. 报告展示补充
+
+报告新增字段展示：SQL 分类、规范化 SQL、Explain 可执行性与失败原因。
+
+---
+
+## 9. 规则与策略补充（关键设计点）
+
+### 9.1 分类规则（示例）
+
+| 分类 | 识别方式 |
+|------|----------|
+| MYBATIS_XML_DYNAMIC | 包含 `<if>` / `<choose>` / `<foreach>` |
+| MYBATIS_XML_STATIC | 无动态标签 |
+| STRING_CONCAT | 检测 `+` 拼接或 StringBuilder |
+| PLACEHOLDER_TEMPLATE | 仅含 `#{}` 或 `${}` 且无 XML 上下文 |
+| UNKNOWN | 无法判定 |
+
+### 9.2 Explain 适配策略
+
+- `#{}` → 统一替换为数值 `1` 或字符串 `'x'`（根据字段上下文推断）
+- `${}` → 标记为不可 Explain 或降级为安全文本（默认不执行 Explain）
+- `IN (#{})` → `IN (1)`
+- 动态标签（if/choose/where/trim）→ 默认生成保守可执行 SQL（如追加 `1=1`）
+- 遇到 DDL / 非 DML → 标记为 `NOT_SUPPORTED`
+
+### 9.3 MyBatis 专项处理
+
+- `<include refid>`：展开 SQL 片段
+- `<selectKey>`：排除或单独记录，不参与主 SQL Explain
+- `<foreach>`：生成 `IN (1,2,3)` 样例
+- `<bind>`：记录绑定变量，可用于替换
+
+---
+
+## 10. 阶段门检查（自检清单）
+
+- [ ] 预处理结果可被 Explain 引擎消费
+- [ ] 动态 SQL 支持专用策略
+- [ ] 失败原因可追踪
+- [ ] 不影响原始 SQL 内容记录
 
 ---
 

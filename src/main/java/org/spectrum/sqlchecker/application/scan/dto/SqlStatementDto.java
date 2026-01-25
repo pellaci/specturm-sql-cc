@@ -7,8 +7,11 @@ import lombok.NoArgsConstructor;
 import org.spectrum.sqlchecker.application.analysis.dto.ExplainAnalysisDto;
 import org.spectrum.sqlchecker.application.analysis.dto.ExpertAnalysisDto;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticAnalysisDto;
+import org.spectrum.sqlchecker.domain.shared.enumeration.ExplainEligibility;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
+import org.spectrum.sqlchecker.domain.shared.enumeration.SqlCategory;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SqlType;
+import org.spectrum.sqlchecker.domain.shared.enumeration.ValidityStatus;
 
 import java.util.List;
 
@@ -43,6 +46,36 @@ public class SqlStatementDto {
      * 抽象 SQL（参数化模板）
      */
     private String abstractSql;
+
+    /**
+     * SQL 分类
+     */
+    private SqlCategory category;
+
+    /**
+     * 规范化 SQL
+     */
+    private String normalizedSql;
+
+    /**
+     * Explain SQL
+     */
+    private String explainSql;
+
+    /**
+     * 合法性状态
+     */
+    private ValidityStatus validity;
+
+    /**
+     * Explain 可执行性
+     */
+    private ExplainEligibility explainEligibility;
+
+    /**
+     * 预处理错误原因
+     */
+    private String preprocessErrorReason;
 
     /**
      * SQL 哈希（用于去重）

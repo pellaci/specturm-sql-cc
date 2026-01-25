@@ -67,6 +67,10 @@ spectrum:
 
     # 数据库配置
     database:
+      # 自动初始化数据库连接
+      auto-init: false
+      # 默认连接名称
+      default-connection: default
       # H2 数据库文件路径
       h2-file: "./data/sqlchecker"
 

@@ -2,6 +2,7 @@ package org.spectrum.sqlchecker.cli;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.ApplicationContext;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine;
 import picocli.spring.PicocliSpringFactory;
@@ -14,6 +15,7 @@ import picocli.spring.PicocliSpringFactory;
  * @since 2.0.0
  */
 @Component
+@ConditionalOnProperty(prefix = "sqlchecker.cli", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SqlCheckerCli implements CommandLineRunner {
 
     private final PicocliSpringFactory picocliFactory;
