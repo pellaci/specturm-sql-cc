@@ -52,4 +52,5 @@ data/
 
 # Local agent/runtime state
 .omx/
+.superpowers/
 .github/java-upgrade/
