@@ -105,6 +105,19 @@ public final class DiagnosticReportFactory {
                         .manualReview(manualReview(sqlStatements))
                         .configWarnings(explainFailures(sqlStatements))
                         .build())
+                .executiveSummary(DiagnosticReport.ExecutiveSummary.builder()
+                        .riskConclusion("")
+                        .topDrivers(List.of())
+                        .recommendedActions(List.of())
+                        .confidenceSummary("")
+                        .build())
+                .campaigns(List.of())
+                .confidence(DiagnosticReport.Confidence.builder()
+                        .level("NEEDS_REVIEW")
+                        .evidenceSources(List.of())
+                        .limitations(List.of())
+                        .build())
+                .methodology(defaultMethodology())
                 .build();
     }
 
@@ -122,6 +135,24 @@ public final class DiagnosticReportFactory {
                 .dangerousDml(limit(dangerousDml(sqlStatements)))
                 .potentialInjection(limit(potentialInjection(sqlStatements)))
                 .fullScanOrNoIndex(limit(fullScanOrNoIndex(sqlStatements)))
+                .build();
+    }
+
+    private static DiagnosticReport.Methodology defaultMethodology() {
+        return DiagnosticReport.Methodology.builder()
+                .scoring(List.of("Score starts from SQL-level diagnostic scores and is capped by critical or warning issue concentration."))
+                .severityDefinitions(List.of(
+                        "CRITICAL: safety, destructive DML, injection, or production-impacting risk.",
+                        "WARNING: performance, maintainability, or correctness risk that should enter remediation planning.",
+                        "INFO: evidence or optimization signal that does not by itself block release."))
+                .coverageDefinitions(List.of(
+                        "Parse coverage measures SQL statements accepted by preprocessing and classification.",
+                        "EXPLAIN coverage measures eligible SQL with successful execution-plan evidence.",
+                        "Manual review marks dynamic templates, skipped EXPLAIN, and evidence gaps."))
+                .knownLimits(List.of(
+                        "Static analysis cannot prove runtime parameter values.",
+                        "Database-free reports do not include real optimizer evidence.",
+                        "Dynamic SQL templates may require manual review even when parse coverage is 100%."))
                 .build();
     }
 

@@ -22,6 +22,10 @@ public class DiagnosticReport {
     private Insights insights;
     private List<Finding> findings;
     private Diagnostics diagnostics;
+    private ExecutiveSummary executiveSummary;
+    private List<RemediationCampaign> campaigns;
+    private Confidence confidence;
+    private Methodology methodology;
 
     @Data
     @Builder
@@ -179,6 +183,66 @@ public class DiagnosticReport {
         private long durationMs;
         private int issueCount;
         private List<String> planSummary;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ExecutiveSummary {
+        private String riskConclusion;
+        private List<String> topDrivers;
+        private List<String> recommendedActions;
+        private String confidenceSummary;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RemediationCampaign {
+        private String id;
+        private String priority;
+        private String theme;
+        private String title;
+        private String summary;
+        private CampaignScope scope;
+        private String evidenceLevel;
+        private List<String> recommendations;
+        private List<String> acceptanceChecklist;
+        private List<String> findingIds;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CampaignScope {
+        private int sqlCount;
+        private int fileCount;
+        private List<String> files;
+        private List<String> examples;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Confidence {
+        private String level;
+        private List<String> evidenceSources;
+        private List<String> limitations;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Methodology {
+        private List<String> scoring;
+        private List<String> severityDefinitions;
+        private List<String> coverageDefinitions;
+        private List<String> knownLimits;
     }
 
     @Data
