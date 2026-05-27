@@ -55,7 +55,7 @@ class VersionCommandTest {
             String output = outputStream.toString();
 
             assertThat(output).contains("SQL Checker v");
-            assertThat(output).contains("1.0.0");
+            assertThat(output).contains("1.2.0");
         }
 
         @Test
@@ -66,7 +66,7 @@ class VersionCommandTest {
             String output = outputStream.toString();
 
             assertThat(output).contains("Built:");
-            assertThat(output).contains("2024-01-01");
+            assertThat(output).contains("2026-05-27");
         }
 
         @Test

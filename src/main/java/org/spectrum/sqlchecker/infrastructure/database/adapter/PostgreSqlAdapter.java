@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * PostgreSQL 数据库适配器
  * <p>
- * 支持 PostgreSQL 9.1+ 的 EXPLAIN (ANALYZE, BUFFERS, VERBOSE) 命令
+ * 使用只读 EXPLAIN，避免 ANALYZE 执行目标 SQL。
  *
  * @author Spectrum SQL Checker
  * @since 2.0.0
@@ -35,8 +35,7 @@ public class PostgreSqlAdapter implements DatabaseAdapter {
         if (trimmed.toUpperCase().startsWith("EXPLAIN")) {
             return trimmed;
         }
-        // 使用 EXPLAIN ANALYZE 获取实际执行时间
-        return "EXPLAIN (ANALYZE, BUFFERS) " + trimmed;
+        return "EXPLAIN " + trimmed;
     }
 
     @Override

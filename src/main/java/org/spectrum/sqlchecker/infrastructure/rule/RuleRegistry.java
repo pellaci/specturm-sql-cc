@@ -57,6 +57,7 @@ public class RuleRegistry {
         // 检查是否已存在
         if (rulesById.containsKey(ruleId)) {
             log.warn("Rule with id '{}' already registered, replacing with: {}", ruleId, rule.getClass().getName());
+            removeRuleMappings(ruleId);
         }
 
         rulesById.put(ruleId, rule);
@@ -115,9 +116,23 @@ public class RuleRegistry {
 
         // 按优先级排序并去重
         return rules.stream()
-                .distinct()
+                .collect(Collectors.toMap(
+                        rule -> rule.getMeta().id(),
+                        rule -> rule,
+                        (first, replacement) -> replacement,
+                        LinkedHashMap::new
+                ))
+                .values()
+                .stream()
                 .sorted(Comparator.comparingInt(SqlRule::getPriority))
                 .collect(Collectors.toList());
+    }
+
+    private void removeRuleMappings(String ruleId) {
+        rulesByNodeType.values().forEach(rules ->
+                rules.removeIf(rule -> ruleId.equals(rule.getMeta().id()))
+        );
+        rulesByNodeType.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
 
     /**

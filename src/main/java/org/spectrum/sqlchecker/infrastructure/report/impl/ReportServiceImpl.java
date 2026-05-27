@@ -3,6 +3,7 @@ package org.spectrum.sqlchecker.infrastructure.report.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.spectrum.sqlchecker.application.report.ReportService;
+import org.spectrum.sqlchecker.application.report.dto.DiagnosticReport;
 import org.spectrum.sqlchecker.application.report.dto.ReportStatItem;
 import org.spectrum.sqlchecker.application.report.dto.ReportSummary;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
@@ -11,6 +12,8 @@ import org.spectrum.sqlchecker.application.scan.dto.SqlStatementDto;
 import org.spectrum.sqlchecker.domain.shared.exception.ScanException;
 import org.spectrum.sqlchecker.domain.shared.util.LabelMapper;
 import org.spectrum.sqlchecker.domain.shared.util.ScorePolicy;
+import org.spectrum.sqlchecker.infrastructure.report.DiagnosticReportFactory;
+import org.spectrum.sqlchecker.infrastructure.report.DiagnosticReportJsonSerializer;
 import org.spectrum.sqlchecker.infrastructure.template.TemplateEngine;
 import org.springframework.stereotype.Service;
 
@@ -46,7 +49,10 @@ public class ReportServiceImpl implements ReportService {
     public void generateHtmlReport(ScanResult scanResult, String outputPath) throws ScanException {
         try {
             Path path = Paths.get(outputPath);
-            Files.createDirectories(path.getParent());
+            Path parent = path.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
 
             try (OutputStream out = new FileOutputStream(outputPath);
                  OutputStreamWriter writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
@@ -70,11 +76,29 @@ public class ReportServiceImpl implements ReportService {
     }
 
     private void generateHtmlReport(ScanResult scanResult, OutputStreamWriter writer) throws IOException {
+        DiagnosticReport report = DiagnosticReportFactory.from(scanResult);
         Map<String, Object> context = new HashMap<>();
+        context.put("report", report);
         context.put("summary", generateSummary(scanResult));
         context.put("sqlStatements", scanResult.getSqlStatements());
 
-        templateEngine.render("report", context, writer);
+        templateEngine.render("diagnostic-report", context, writer);
+    }
+
+    @Override
+    public void generateJsonReport(ScanResult scanResult, String outputPath) throws ScanException {
+        try {
+            Path path = Paths.get(outputPath);
+            Path parent = path.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            DiagnosticReport report = DiagnosticReportFactory.from(scanResult);
+            Files.writeString(path, DiagnosticReportJsonSerializer.toJson(report), StandardCharsets.UTF_8);
+            log.info("JSON report generated: {}", outputPath);
+        } catch (IOException e) {
+            throw new ScanException("Failed to generate JSON report: " + outputPath, e);
+        }
     }
 
     @Override

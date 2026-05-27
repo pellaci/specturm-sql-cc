@@ -20,6 +20,8 @@ class SqlScanSupportTest {
         assertThat(SqlScanSupport.looksLikeSql("UPDATE users SET name='a'" )).isTrue();
         assertThat(SqlScanSupport.looksLikeSql("delete from users" )).isTrue();
         assertThat(SqlScanSupport.looksLikeSql("update:sku:enlandy:")).isFalse();
+        assertThat(SqlScanSupport.looksLikeSql("update sku sale state result->{}")).isFalse();
+        assertThat(SqlScanSupport.looksLikeSql("create file:")).isFalse();
     }
 
     @Test
@@ -30,6 +32,27 @@ class SqlScanSupportTest {
         assertThat(candidates).hasSize(1);
         assertThat(candidates.get(0).sql()).contains("SELECT * FROM users");
         assertThat(candidates.get(0).line()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("extractSqlFromJavaWithLocations should reconstruct concatenated SQL")
+    void extract_concatenated_sql_from_java() {
+        String content = """
+                class SkuServiceTest {
+                    void writeUpdate() {
+                        sql.append("update `s_sku` set price="+price+",jd_price="+jdPrice+",our_price="+price+" where jd_sku_id="+jdSkuId+";\\n");
+                    }
+                }
+                """;
+
+        List<SqlScanSupport.SqlCandidate> candidates = SqlScanSupport.extractSqlFromJavaWithLocations(content);
+
+        assertThat(candidates).hasSize(1);
+        assertThat(candidates.get(0).sql())
+                .contains("update `s_sku` set price=?")
+                .contains("jd_price=?")
+                .contains("where jd_sku_id=?");
+        assertThat(candidates.get(0).line()).isEqualTo(3);
     }
 
     @Test

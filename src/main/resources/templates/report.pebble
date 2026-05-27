@@ -1584,7 +1584,7 @@
 
     <!-- Footer -->
     <div class="footer">
-        <p>由 <span class="footer-brand">光谱 SQL Checker</span> 生成 | v1.0.0</p>
+        <p>由 <span class="footer-brand">光谱 SQL Checker</span> 生成 | v1.2.0</p>
         <p style="margin-top: 8px; font-size: 12px;">扫描耗时: {{ (summary.durationMs / 1000) | numberFormat }}秒</p>
     </div>
 

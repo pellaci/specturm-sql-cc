@@ -32,7 +32,7 @@ import java.util.Set;
         name = "Avoid SELECT *",
         description = "使用 SELECT * 会查询所有列，可能造成不必要的 I/O 和网络开销",
         type = RuleType.PROBLEM,
-        severity = SeverityLevel.WARNING,
+        severity = SeverityLevel.CRITICAL,
         tags = {"performance", "readability"},
         category = RuleCategory.PERFORMANCE
 )
@@ -45,15 +45,13 @@ public class SelectStarRule implements SqlRule {
 
     @Override
     public Set<Class<?>> supportedNodeTypes() {
-        return Set.of(PlainSelect.class, AllColumns.class);
+        return Set.of(PlainSelect.class);
     }
 
     @Override
     public void visit(Object node, RuleContext context) {
         if (node instanceof PlainSelect select) {
             checkSelect(select, context);
-        } else if (node instanceof AllColumns) {
-            reportAllColumns(context);
         }
     }
 

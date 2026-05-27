@@ -36,6 +36,8 @@ public class TemplateEngine {
         this.engine = new PebbleEngine.Builder()
                 .loader(loader)
                 .strictVariables(false)
+                .autoEscaping(true)
+                .defaultEscapingStrategy("html")
                 .cacheActive(false)  // 开发环境禁用缓存
                 .extension(new NumberFormatExtension())
                 .build();

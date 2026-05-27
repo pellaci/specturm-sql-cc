@@ -44,24 +44,25 @@ class ScanServiceImplTest {
         }
 
         @Test
-        @DisplayName("应该返回 SQL 语句列表")
+        @DisplayName("legacy scan service should not return synthetic SQL statements")
         void should_return_sql_statements() {
             ScanRequest request = createScanRequest();
 
             ScanResult result = scanService.scan(request);
 
-            assertThat(result.getSqlStatements()).isNotEmpty();
+            assertThat(result.getSqlStatements()).isEmpty();
         }
 
         @Test
-        @DisplayName("应该设置正确的扫描统计信息")
+        @DisplayName("legacy scan service should return an empty completed result")
         void should_set_scan_statistics() {
             ScanRequest request = createScanRequest();
 
             ScanResult result = scanService.scan(request);
 
-            assertThat(result.getFilesScanned()).isGreaterThan(0);
-            assertThat(result.getSqlFound()).isGreaterThan(0);
+            assertThat(result.getFilesScanned()).isZero();
+            assertThat(result.getSqlFound()).isZero();
+            assertThat(result.getScanPath()).isEqualTo("/tmp/test");
         }
     }
 

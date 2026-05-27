@@ -5,7 +5,9 @@ import lombok.Getter;
 import net.sf.jsqlparser.statement.Statement;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 规则执行上下文
@@ -46,6 +48,12 @@ public class RuleContext {
     private final List<RuleIssue> issues = new ArrayList<>();
 
     /**
+     * 已上报的问题签名，用于避免 AST 多路径遍历导致同一规则重复上报。
+     */
+    @Builder.Default
+    private final Set<String> issueKeys = new HashSet<>();
+
+    /**
      * 解析错误信息列表
      */
     @Builder.Default
@@ -67,7 +75,17 @@ public class RuleContext {
             return;
         }
 
-        issues.add(issue);
+        String issueKey = buildIssueKey(issue);
+        if (issueKeys.add(issueKey)) {
+            issues.add(issue);
+        }
+    }
+
+    private String buildIssueKey(RuleIssue issue) {
+        String location = issue.getLocation() == null
+                ? ""
+                : issue.getLocation().getSqlId() + ":" + issue.getLocation().getStartLine() + ":" + issue.getLocation().getStartColumn();
+        return issue.getRuleId() + "|" + location + "|" + issue.getMessage();
     }
 
     /**

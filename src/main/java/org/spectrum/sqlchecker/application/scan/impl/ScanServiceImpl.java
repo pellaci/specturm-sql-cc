@@ -6,11 +6,6 @@ import org.spectrum.sqlchecker.application.scan.ScanService;
 import org.spectrum.sqlchecker.application.scan.dto.ScanProgress;
 import org.spectrum.sqlchecker.application.scan.dto.ScanRequest;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
-import org.spectrum.sqlchecker.application.scan.dto.SqlStatementDto;
-import org.spectrum.sqlchecker.application.analysis.dto.StaticAnalysisDto;
-import org.spectrum.sqlchecker.application.analysis.dto.ExplainAnalysisDto;
-import org.spectrum.sqlchecker.application.analysis.dto.ExpertAnalysisDto;
-import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -49,19 +44,21 @@ public class ScanServiceImpl implements ScanService {
                 .build();
         progressMap.put(scanId, progress);
 
-        // 执行扫描（模拟）
-        List<SqlStatementDto> sqlStatements = performScan(request, scanId);
-
-        // 创建结果
+        // Legacy API placeholder. Real CLI scans must go through ScanOrchestratorImpl.
+        Instant now = Instant.now();
         ScanResult result = ScanResult.builder()
                 .scanId(scanId)
                 .status(org.spectrum.sqlchecker.domain.shared.enumeration.ScanStatus.COMPLETED)
-                .filesScanned(sqlStatements.size())
-                .sqlFound(sqlStatements.size())
-                .uniqueSqlFound(sqlStatements.size())
-                .durationMs(1000)
-                .sqlStatements(sqlStatements)
+                .scanPath(request != null ? request.getRepositoryPath() : null)
+                .filesScanned(0)
+                .totalFiles(0)
+                .sqlFound(0)
+                .uniqueSqlFound(0)
+                .durationMs(0)
+                .sqlStatements(new ArrayList<>())
                 .errors(new ArrayList<>())
+                .startTime(now)
+                .endTime(now)
                 .build();
 
         resultMap.put(scanId, result);
@@ -99,63 +96,5 @@ public class ScanServiceImpl implements ScanService {
             scan(request);
         }).start();
         return scanId;
-    }
-
-    /**
-     * 执行扫描（模拟实现）
-     */
-    private List<SqlStatementDto> performScan(ScanRequest request, String scanId) {
-        List<SqlStatementDto> statements = new ArrayList<>();
-
-        // 模拟一些 SQL 语句用于演示
-        for (int i = 1; i <= 3; i++) {
-            SqlStatementDto dto = SqlStatementDto.builder()
-                    .id(UUID.randomUUID().toString())
-                    .originalSql("SELECT * FROM users WHERE id = " + i)
-                    .abstractSql("SELECT * FROM users WHERE id = ?")
-                    .sqlHash(UUID.randomUUID().toString())
-                    .sqlType(org.spectrum.sqlchecker.domain.shared.enumeration.SqlType.SELECT)
-                    .locations(new ArrayList<>())
-                    .severity(i == 1 ? SeverityLevel.CRITICAL : SeverityLevel.WARNING)
-                    .score(i == 1 ? 50 : 70)
-                    .build();
-
-            // 添加分析结果
-            dto.setStaticAnalysis(createMockStaticAnalysis(dto.getId()));
-            dto.setExplainAnalysis(createMockExplainAnalysis(dto.getId()));
-            dto.setExpertAnalysis(createMockExpertAnalysis(dto.getId()));
-
-            statements.add(dto);
-        }
-
-        return statements;
-    }
-
-    private StaticAnalysisDto createMockStaticAnalysis(String sqlId) {
-        return StaticAnalysisDto.builder()
-                .sqlId(sqlId)
-                .severity(SeverityLevel.WARNING)
-                .issues(new ArrayList<>())
-                .score(70)
-                .durationMs(100)
-                .build();
-    }
-
-    private ExplainAnalysisDto createMockExplainAnalysis(String sqlId) {
-        return ExplainAnalysisDto.builder()
-                .sqlId(sqlId)
-                .severity(SeverityLevel.INFO)
-                .issues(new ArrayList<>())
-                .durationMs(200)
-                .build();
-    }
-
-    private ExpertAnalysisDto createMockExpertAnalysis(String sqlId) {
-        return ExpertAnalysisDto.builder()
-                .sqlId(sqlId)
-                .recommendations(new ArrayList<>())
-                .score(80)
-                .durationMs(150)
-                .build();
     }
 }

@@ -65,6 +65,20 @@ class RuleRegistryTest {
 
             assertThat(registry.getRuleCount()).isEqualTo(1);
             assertThat(registry.getRule("test-rule").orElse(null)).isEqualTo(rule2);
+            assertThat(registry.getRulesForNode(PlainSelect.class)).isEmpty();
+            assertThat(registry.getRulesForNode(Statement.class)).containsExactly(rule2);
+        }
+
+        @Test
+        @DisplayName("重复注册同 ID 规则时不应该重复返回")
+        void should_not_return_duplicate_rules_for_same_id() {
+            SqlRule rule1 = createMockRule("test-rule", Set.of(PlainSelect.class));
+            SqlRule rule2 = createMockRule("test-rule", Set.of(PlainSelect.class));
+
+            registry.register(rule1);
+            registry.register(rule2);
+
+            assertThat(registry.getRulesForNode(PlainSelect.class)).containsExactly(rule2);
         }
 
         @Test
@@ -95,6 +109,34 @@ class RuleRegistryTest {
             assertThat(registry.getRuleCount()).isEqualTo(2);
             assertThat(registry.hasRule("rule-1")).isTrue();
             assertThat(registry.hasRule("rule-2")).isTrue();
+        }
+
+        @Test
+        @DisplayName("重复批量注册同一组规则不应该产生重复节点映射")
+        void should_not_duplicate_node_mappings_when_register_all_repeatedly() {
+            SqlRule rule1 = createMockRule("rule-1", Set.of(PlainSelect.class), 10);
+            SqlRule rule2 = createMockRule("rule-2", Set.of(PlainSelect.class), 20);
+
+            registry.registerAll(List.of(rule1, rule2));
+            registry.registerAll(List.of(rule1, rule2));
+
+            assertThat(registry.getRuleCount()).isEqualTo(2);
+            assertThat(registry.getRulesForNode(PlainSelect.class)).containsExactly(rule1, rule2);
+        }
+
+        @Test
+        @DisplayName("同 ID 规则被新节点类型替换后旧节点类型不应残留")
+        void should_remove_old_node_mapping_when_replaced_by_different_node_type() {
+            SqlRule plainSelectRule = createMockRule("shared-rule", Set.of(PlainSelect.class), 10);
+            SqlRule statementRule = createMockRule("shared-rule", Set.of(Statement.class), 5);
+
+            registry.registerAll(List.of(plainSelectRule));
+            registry.registerAll(List.of(statementRule));
+
+            assertThat(registry.getRuleCount()).isEqualTo(1);
+            assertThat(registry.getRule("shared-rule")).contains(statementRule);
+            assertThat(registry.getRulesForNode(PlainSelect.class)).isEmpty();
+            assertThat(registry.getRulesForNode(Statement.class)).containsExactly(statementRule);
         }
 
         @Test
@@ -133,6 +175,29 @@ class RuleRegistryTest {
             // 应该按优先级排序
             assertThat(rules.get(0)).isEqualTo(rule1);
             assertThat(rules.get(1)).isEqualTo(rule2);
+        }
+
+        @Test
+        @DisplayName("父类型查询会返回已注册的子类型规则并按 ID 去重")
+        void should_return_child_rules_for_parent_node_query_without_duplicates() {
+            SqlRule plainSelectRule = createMockRule("rule-1", Set.of(PlainSelect.class), 20);
+            SqlRule statementRule = createMockRule("rule-2", Set.of(Statement.class), 10);
+
+            registry.registerAll(List.of(plainSelectRule, statementRule));
+
+            List<SqlRule> rules = registry.getRulesForNode(Statement.class);
+
+            assertThat(rules).containsExactly(statementRule, plainSelectRule);
+        }
+
+        @Test
+        @DisplayName("子类型查询不应该匹配仅注册在父类型上的规则")
+        void should_not_match_parent_only_rule_when_querying_child_node() {
+            SqlRule statementRule = createMockRule("statement-rule", Set.of(Statement.class), 10);
+
+            registry.register(statementRule);
+
+            assertThat(registry.getRulesForNode(PlainSelect.class)).isEmpty();
         }
 
         @Test

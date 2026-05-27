@@ -80,16 +80,16 @@ public class ExplainAnalysisServiceImpl implements ExplainAnalysisService {
                     .build();
 
         } catch (ConnectionException e) {
-            log.error("数据库连接失败: connectionId={}", connectionId, e);
+            log.warn("数据库连接失败: connectionId={}, reason={}", connectionId, e.getMessage());
             return buildErrorResult(sqlId, "数据库连接失败: " + e.getMessage());
         } catch (SQLTimeoutException e) {
-            log.error("EXPLAIN 执行超时: sqlId={}, sql={}", sqlId, sql, e);
+            log.warn("EXPLAIN 执行超时: sqlId={}", sqlId);
             return buildErrorResult(sqlId, "EXPLAIN 执行超时");
         } catch (SQLException e) {
-            log.error("EXPLAIN 执行失败: sqlId={}, sql={}", sqlId, sql, e);
+            log.debug("EXPLAIN 执行失败: sqlId={}, reason={}", sqlId, e.getMessage());
             return buildErrorResult(sqlId, "EXPLAIN 执行失败: " + e.getMessage());
         } catch (Exception e) {
-            log.error("EXPLAIN 分析异常: sqlId={}", sqlId, e);
+            log.warn("EXPLAIN 分析异常: sqlId={}, reason={}", sqlId, e.getMessage());
             return buildErrorResult(sqlId, "分析异常: " + e.getMessage());
         }
     }
@@ -127,14 +127,10 @@ public class ExplainAnalysisServiceImpl implements ExplainAnalysisService {
         return ExplainAnalysisDto.builder()
                 .sqlId(sqlId)
                 .plan(ExplainPlan.builder().nodes(new ArrayList<>()).build())
-                .issues(List.of(ExplainIssue.builder()
-                        .type("ANALYSIS_ERROR")
-                        .severity(SeverityLevel.WARNING)
-                        .message("无法分析执行计划")
-                        .suggestion(errorMessage)
-                        .build()))
-                .severity(SeverityLevel.WARNING)
+                .issues(List.of())
+                .severity(SeverityLevel.INFO)
                 .durationMs(0)
+                .errorMessage(errorMessage)
                 .build();
     }
 

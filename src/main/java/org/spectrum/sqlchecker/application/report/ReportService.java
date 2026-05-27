@@ -34,6 +34,15 @@ public interface ReportService {
     void generateHtmlReport(ScanResult scanResult, OutputStream outputStream) throws ScanException;
 
     /**
+     * 生成结构化 JSON 诊断报告
+     *
+     * @param scanResult 扫描结果
+     * @param outputPath 输出路径
+     * @throws ScanException 生成失败
+     */
+    void generateJsonReport(ScanResult scanResult, String outputPath) throws ScanException;
+
+    /**
      * 生成报告摘要
      *
      * @param scanResult 扫描结果

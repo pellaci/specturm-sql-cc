@@ -6,7 +6,6 @@ import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import org.spectrum.sqlchecker.application.analysis.ExplainAnalysisService;
 import org.spectrum.sqlchecker.application.analysis.dto.ExplainAnalysisDto;
-import org.spectrum.sqlchecker.application.analysis.dto.ExplainIssue;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticAnalysisDto;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticIssue;
 import org.spectrum.sqlchecker.application.preprocess.SqlPreprocessService;
@@ -18,6 +17,8 @@ import org.spectrum.sqlchecker.application.scan.orchestrator.ScanProgressListene
 import org.spectrum.sqlchecker.application.schema.SchemaInitializationService;
 import org.spectrum.sqlchecker.application.schema.dto.SchemaInitializationResult;
 import org.spectrum.sqlchecker.domain.rule.RuleIssue;
+import org.spectrum.sqlchecker.domain.scanner.service.extractor.SqlExtractor;
+import org.spectrum.sqlchecker.domain.scanner.service.extractor.SqlExtractorFactory;
 import org.spectrum.sqlchecker.domain.shared.enumeration.ExplainEligibility;
 import org.spectrum.sqlchecker.domain.shared.enumeration.IssueType;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SeverityLevel;
@@ -26,6 +27,7 @@ import org.spectrum.sqlchecker.domain.shared.enumeration.SqlSourceType;
 import org.spectrum.sqlchecker.domain.shared.enumeration.ValidityStatus;
 import org.spectrum.sqlchecker.domain.shared.util.LabelMapper;
 import org.spectrum.sqlchecker.domain.shared.util.ScorePolicy;
+import org.spectrum.sqlchecker.domain.shared.valueobject.FileType;
 import org.spectrum.sqlchecker.infrastructure.database.ConnectionManager;
 import org.spectrum.sqlchecker.infrastructure.extractor.MyBatisSqlExtractor;
 import org.spectrum.sqlchecker.infrastructure.rule.SqlRuleEngine;
@@ -67,6 +69,9 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
 
     @Autowired(required = false)
     private SqlRuleEngine ruleEngine;
+
+    @Autowired(required = false)
+    private SqlExtractorFactory sqlExtractorFactory;
 
     @Override
     public ScanExecutionResult execute(ScanExecutionRequest request, ScanProgressListener listener) {
@@ -171,11 +176,8 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         List<File> files = new ArrayList<>();
         try (Stream<Path> paths = Files.walk(dir.toPath())) {
             paths.filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".java") || p.toString().endsWith(".xml") || p.toString().endsWith(".sql"))
-                    .filter(p -> !p.toString().contains("/target/"))
-                    .filter(p -> !p.toString().contains("/build/"))
-                    .filter(p -> !p.toString().contains("/.git/"))
-                    .filter(p -> !p.toString().contains("/node_modules/"))
+                    .filter(this::isSupportedScanFile)
+                    .filter(p -> !isIgnoredScanPath(p))
                     .forEach(p -> {
                         files.add(p.toFile());
                         if (p.toString().endsWith(".java")) {
@@ -192,6 +194,20 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         return files;
     }
 
+    private boolean isIgnoredScanPath(Path path) {
+        String normalized = path.toString().replace(File.separatorChar, '/');
+        return normalized.contains("/target/")
+                || normalized.contains("/build/")
+                || normalized.contains("/out/")
+                || normalized.contains("/dist/")
+                || normalized.contains("/coverage/")
+                || normalized.contains("/.git/")
+                || normalized.contains("/.idea/")
+                || normalized.contains("/.mvn/")
+                || normalized.contains("/.gradle/")
+                || normalized.contains("/node_modules/");
+    }
+
     private void scanFile(File file, ScanContext context) {
         String name = file.getName();
         if (name.endsWith(".java")) {
@@ -200,6 +216,8 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
             scanXmlFile(file, context);
         } else if (name.endsWith(".sql")) {
             scanSqlFile(file, context);
+        } else if (name.endsWith(".js") || name.endsWith(".ts")) {
+            scanExtractorFile(file, context);
         }
     }
 
@@ -231,6 +249,9 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
     }
 
     private void scanXmlFile(File file, ScanContext context) {
+        if (scanExtractorFile(file, context)) {
+            return;
+        }
         try {
             String content = Files.readString(file.toPath());
             String relativePath = getRelativePath(file, context.path);
@@ -257,6 +278,39 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         }
     }
 
+    private boolean scanExtractorFile(File file, ScanContext context) {
+        SqlExtractor extractor = resolveExtractor(file);
+        if (extractor == null) {
+            return false;
+        }
+
+        try {
+            String content = Files.readString(file.toPath());
+            String relativePath = getRelativePath(file, context.path);
+            if (extractor instanceof MyBatisSqlExtractor myBatisExtractor) {
+                List<MyBatisSqlExtractor.LocatedSql> sqls = myBatisExtractor.extractWithLocations(content);
+                for (MyBatisSqlExtractor.LocatedSql sql : sqls) {
+                    handleSqlFound(file, relativePath, sql.sql(), sql.line(), extractor.getSourceType(), context);
+                }
+            } else {
+                List<String> sqls = extractor.extract(content);
+                for (String sql : sqls) {
+                    handleSqlFound(file, relativePath, sql, 1, extractor.getSourceType(), context);
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            if (context.verbose) {
+                System.out.println("  [ERROR] Failed to read: " + file.getName());
+            }
+        } catch (Exception e) {
+            if (context.verbose) {
+                System.out.println("  [ERROR] Failed to extract SQL: " + file.getName() + " - " + e.getMessage());
+            }
+        }
+        return false;
+    }
+
     private void scanSqlFile(File file, ScanContext context) {
         try {
             String content = Files.readString(file.toPath());
@@ -271,6 +325,29 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                 System.out.println("  [ERROR] Failed to read: " + file.getName());
             }
         }
+    }
+
+    private boolean isSupportedScanFile(Path path) {
+        String name = path.toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".java")
+                || name.endsWith(".xml")
+                || name.endsWith(".sql")
+                || name.endsWith(".js")
+                || name.endsWith(".ts");
+    }
+
+    private SqlExtractor resolveExtractor(File file) {
+        FileType fileType = FileType.fromPath(file.getName());
+        if (sqlExtractorFactory != null) {
+            SqlExtractor extractor = sqlExtractorFactory.getExtractor(fileType);
+            if (extractor != null) {
+                return extractor;
+            }
+        }
+        if (fileType.isXml()) {
+            return myBatisSqlExtractor;
+        }
+        return null;
     }
 
     private void handleSqlFound(File file, String relativePath, String sql, int line, SqlSourceType sourceType, ScanContext context) {
@@ -329,6 +406,7 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         List<ScanIssue> issues = new ArrayList<>();
 
         issues.addAll(checkSqlInjectionRisk(fileName, originalSql));
+        issues.addAll(checkSyntaxSmells(fileName, originalSql));
 
         String analysisSql = preprocessResult != null && preprocessResult.getNormalizedSql() != null
                 ? preprocessResult.getNormalizedSql()
@@ -384,19 +462,6 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                         }
                     }
 
-                    if (explainResult != null && explainResult.getIssues() != null && !explainResult.getIssues().isEmpty()) {
-                        for (ExplainIssue explainIssue : explainResult.getIssues()) {
-                            ScanIssue explainSqlIssue = ScanIssue.builder()
-                                    .fileName(fileName + " [EXPLAIN]")
-                                    .sql(explainSql)
-                                    .type(explainIssue.getType())
-                                    .severity(explainIssue.getSeverity().name())
-                                    .message(explainIssue.getMessage() + (explainIssue.getSuggestion() != null
-                                            ? " 💡 " + explainIssue.getSuggestion() : ""))
-                                    .build();
-                            issues.add(explainSqlIssue);
-                        }
-                    }
                 } else if (context.verbose) {
                     System.out.println("  [EXPLAIN_SKIP] Connection '" + context.dbConnection + "' not configured");
                 }
@@ -432,10 +497,24 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         return ScanIssue.builder()
                 .fileName(fileName)
                 .sql(sql)
-                .type(ruleIssue.getRuleId().toUpperCase().replace("-", "_"))
+                .type(normalizeRuleId(ruleIssue.getRuleId()))
                 .severity(severityToString(ruleIssue.getSeverity()))
                 .message(ruleIssue.getMessage() + (ruleIssue.getSuggestion() != null ? " 💡 " + ruleIssue.getSuggestion() : ""))
                 .build();
+    }
+
+    private String normalizeRuleId(String ruleId) {
+        if (ruleId == null || ruleId.isBlank()) {
+            return "UNKNOWN";
+        }
+        String normalized = ruleId.trim()
+                .replace("-", "_")
+                .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+                .toUpperCase(Locale.ROOT);
+        if ("ORDERBY_WITHOUT_LIMIT".equals(normalized)) {
+            return "ORDER_BY_WITHOUT_LIMIT";
+        }
+        return normalized;
     }
 
     private String severityToString(SeverityLevel level) {
@@ -578,6 +657,29 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         return issues;
     }
 
+    private List<ScanIssue> checkSyntaxSmells(String fileName, String sql) {
+        List<ScanIssue> issues = new ArrayList<>();
+        if (sql != null && sql.matches("(?s).*\\w\\s*,\\s*,+\\s*\\w.*")) {
+            issues.add(ScanIssue.builder()
+                    .fileName(fileName)
+                    .sql(sql)
+                    .type("SQL_SYNTAX_ERROR")
+                    .severity("CRITICAL")
+                    .message("检测到连续逗号，SQL 可能在运行时语法错误 💡 修正多余逗号后再发布")
+                    .build());
+        }
+        if (sql != null && sql.toUpperCase(Locale.ROOT).matches("(?s).*\\bFROM\\s+[`\\w.]+\\s+AND\\b.*")) {
+            issues.add(ScanIssue.builder()
+                    .fileName(fileName)
+                    .sql(sql)
+                    .type("SQL_SYNTAX_ERROR")
+                    .severity("CRITICAL")
+                    .message("检测到 FROM 后直接跟 AND，疑似缺少 WHERE 💡 将 AND 改为 WHERE 或补全 JOIN 条件")
+                    .build());
+        }
+        return issues;
+    }
+
     private void computeIssueSummary(ScanContext context) {
         for (ScanIssue issue : context.allIssues) {
             context.issueSummary.put(issue.getType(), context.issueSummary.getOrDefault(issue.getType(), 0) + 1);
@@ -682,11 +784,12 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
 
     private IssueType mapToIssueType(String type) {
         if (type == null) {
-            return IssueType.SELECT_WITHOUT_WHERE;
+            return IssueType.UNKNOWN;
         }
         return switch (type.toUpperCase()) {
             case "SELECT_STAR" -> IssueType.SELECT_STAR;
             case "MISSING_WHERE" -> IssueType.SELECT_WITHOUT_WHERE;
+            case "ORDER_BY_WITHOUT_LIMIT", "ORDERBY_WITHOUT_LIMIT" -> IssueType.ORDER_BY_WITHOUT_LIMIT;
             case "LIKE_LEADING_WILDCARD" -> IssueType.LIKE_LEADING_WILDCARD;
             case "IMPLICIT_JOIN" -> IssueType.CROSS_JOIN;
             case "MULTI_COLUMN_OR" -> IssueType.MISSING_INDEX;
@@ -695,7 +798,8 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
             case "COMPLEX_SUBQUERY" -> IssueType.SUBQUERY_IN_SELECT;
             case "N_PLUS_ONE" -> IssueType.POTENTIAL_N_PLUS_ONE;
             case "SQL_INJECTION" -> IssueType.SQL_INJECTION_RISK;
-            default -> IssueType.SELECT_WITHOUT_WHERE;
+            case "SQL_SYNTAX_ERROR" -> IssueType.SQL_SYNTAX_ERROR;
+            default -> IssueType.UNKNOWN;
         };
     }
 

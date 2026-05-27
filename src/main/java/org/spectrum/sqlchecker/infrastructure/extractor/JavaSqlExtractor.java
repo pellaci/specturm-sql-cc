@@ -5,6 +5,7 @@ import org.spectrum.sqlchecker.domain.scanner.service.extractor.SqlExtractor;
 import org.spectrum.sqlchecker.domain.shared.enumeration.SqlSourceType;
 import org.spectrum.sqlchecker.domain.shared.exception.SqlExtractionException;
 import org.spectrum.sqlchecker.domain.shared.valueobject.FileType;
+import org.spectrum.sqlchecker.infrastructure.scan.SqlScanSupport;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -121,28 +122,7 @@ public class JavaSqlExtractor implements SqlExtractor {
             return false;
         }
 
-        // SQL 关键字后必须跟空白字符，表示有后续的表名/字段等
-        return matchesSqlPattern(upper, "SELECT ")
-                || matchesSqlPattern(upper, "INSERT ")
-                || matchesSqlPattern(upper, "UPDATE ")
-                || matchesSqlPattern(upper, "DELETE ")
-                || matchesSqlPattern(upper, "CREATE ")
-                || matchesSqlPattern(upper, "ALTER ")
-                || matchesSqlPattern(upper, "DROP ")
-                || matchesSqlPattern(upper, "TRUNCATE ")
-                || matchesSqlPattern(upper, "REPLACE ")
-                || matchesSqlPattern(upper, "WITH ")
-                || matchesSqlPattern(upper, "CALL ")
-                || matchesSqlPattern(upper, "SHOW ")
-                || matchesSqlPattern(upper, "DESC ")
-                || matchesSqlPattern(upper, "DESCRIBE ");
-    }
-
-    /**
-     * 检查字符串是否以指定的 SQL 关键字模式开头
-     */
-    private boolean matchesSqlPattern(String upper, String keyword) {
-        return upper.startsWith(keyword);
+        return SqlScanSupport.looksLikeSql(upper);
     }
 
     /**

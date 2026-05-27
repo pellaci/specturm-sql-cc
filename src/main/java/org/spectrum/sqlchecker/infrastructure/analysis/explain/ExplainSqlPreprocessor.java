@@ -35,6 +35,12 @@ public class ExplainSqlPreprocessor {
     private static final Pattern HASH_PLACEHOLDER_PATTERN =
             Pattern.compile("#\\{[^}]+}");
 
+    private static final Pattern LEADING_EXPLAIN_PATTERN =
+            Pattern.compile("(?is)^\\s*EXPLAIN\\s+(?:\\([^)]*\\)\\s*)?");
+
+    private static final Pattern WITH_MUTATION_PATTERN =
+            Pattern.compile("(?is)^\\s*WITH\\b.*\\)\\s*(INSERT|UPDATE|DELETE|REPLACE|MERGE)\\b");
+
     public PreprocessResult preprocess(String sql) {
         if (sql == null) {
             return new PreprocessResult(null, false, null, false);
@@ -45,16 +51,18 @@ public class ExplainSqlPreprocessor {
 
         String trimmed = processed.trim();
         String upper = trimmed.toUpperCase(Locale.ROOT);
+        String explainTarget = LEADING_EXPLAIN_PATTERN.matcher(trimmed).replaceFirst("").trim();
+        String targetUpper = explainTarget.toUpperCase(Locale.ROOT);
+
+        if (isMutatingStatement(targetUpper) || WITH_MUTATION_PATTERN.matcher(explainTarget).find()) {
+            return new PreprocessResult(processed, true, "EXPLAIN 仅允许只读查询语句，已跳过变更语句", false);
+        }
 
         // 仅对常见可解释语句执行计划
         if (!(upper.startsWith("SELECT")
                 || upper.startsWith("WITH")
-                || upper.startsWith("EXPLAIN")
-                || upper.startsWith("UPDATE")
-                || upper.startsWith("DELETE")
-                || upper.startsWith("INSERT")
-                || upper.startsWith("REPLACE"))) {
-            return new PreprocessResult(processed, true, "仅对可执行 EXPLAIN 的 DML/查询语句执行", false);
+                || upper.startsWith("EXPLAIN"))) {
+            return new PreprocessResult(processed, true, "仅对可执行 EXPLAIN 的只读查询语句执行", false);
         }
 
         // 先处理 INCLUDE/BIND 占位符
@@ -92,6 +100,14 @@ public class ExplainSqlPreprocessor {
         }
 
         return new PreprocessResult(processed, false, null, changed);
+    }
+
+    private boolean isMutatingStatement(String upperSql) {
+        return upperSql.startsWith("INSERT")
+                || upperSql.startsWith("UPDATE")
+                || upperSql.startsWith("DELETE")
+                || upperSql.startsWith("REPLACE")
+                || upperSql.startsWith("MERGE");
     }
 
     public record PreprocessResult(String sql, boolean skipped, String reason, boolean changed) {

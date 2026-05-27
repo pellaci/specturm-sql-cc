@@ -160,14 +160,40 @@ public class ProgressDisplay {
      */
     public void showSimpleResult(int totalFiles, int javaFiles, int xmlFiles, int sqlFiles, int sqlFound, int sqlParsed,
                                   int critical, int warning, int info, long duration, String reportPath) {
+        showSimpleResult(totalFiles, javaFiles, xmlFiles, sqlFiles, sqlFound, sqlParsed,
+                critical, warning, info, duration, reportPath, null);
+    }
+
+    public void showSimpleResult(int totalFiles, int javaFiles, int xmlFiles, int sqlFiles, int sqlFound, int sqlParsed,
+                                  int critical, int warning, int info, long duration, String reportPath, String jsonReportPath) {
+        double parseRate = sqlFound == 0 ? 0.0 : Math.min(sqlParsed, sqlFound) * 100.0 / sqlFound;
+        int parseFailures = Math.max(sqlFound - sqlParsed, 0);
+        showSimpleResult(totalFiles, javaFiles, xmlFiles, sqlFiles, sqlFound, sqlParsed, parseRate, parseFailures,
+                critical, warning, info, duration, reportPath, jsonReportPath);
+    }
+
+    public void showSimpleResult(int totalFiles, int javaFiles, int xmlFiles, int sqlFiles, int sqlFound, int uniqueSql,
+                                  double parseRate, int parseFailures, int critical, int warning, int info,
+                                  long duration, String reportPath, String jsonReportPath) {
+        showSimpleResult(totalFiles, javaFiles, xmlFiles, sqlFiles, sqlFound, uniqueSql, parseRate, parseFailures,
+                0, 0, critical, warning, info, duration, reportPath, jsonReportPath);
+    }
+
+    public void showSimpleResult(int totalFiles, int javaFiles, int xmlFiles, int sqlFiles, int sqlFound, int uniqueSql,
+                                  double parseRate, int parseFailures, int manualReview, int skippedExplain,
+                                  int critical, int warning, int info, long duration, String reportPath, String jsonReportPath) {
         out.println();
         out.println("═══════════════════════════════════════════════════════════════");
         out.println(BOLD + "Scan Results" + RESET);
         out.println("═══════════════════════════════════════════════════════════════");
         out.println("  Files scanned: " + totalFiles + " (" + javaFiles + " Java, " + xmlFiles + " XML, " + sqlFiles + " SQL)");
-        out.println("  SQL found:     " + sqlFound);
-        out.println("  SQL parsed:    " + sqlParsed);
-        out.println("  Duration:      " + duration + "ms");
+        out.println("  SQL occurrences: " + sqlFound);
+        out.println("  Unique SQL:       " + uniqueSql);
+        out.println("  Parse coverage:   " + String.format("%.1f%%", parseRate));
+        out.println("  Parse failures:   " + parseFailures);
+        out.println("  Manual review:    " + manualReview);
+        out.println("  EXPLAIN skipped:  " + skippedExplain);
+        out.println("  Duration:         " + duration + "ms");
         out.println();
 
         out.println(BOLD + "Issue Summary:" + RESET);
@@ -186,6 +212,9 @@ public class ProgressDisplay {
         out.println();
 
         out.println(GREEN + "📄" + RESET + " HTML report: " + reportPath);
+        if (jsonReportPath != null && !jsonReportPath.isBlank()) {
+            out.println(GREEN + "📦" + RESET + " JSON report: " + jsonReportPath);
+        }
         out.println();
     }
 

@@ -34,10 +34,19 @@ public final class SqlScanSupport {
 
     public static List<SqlCandidate> extractSqlFromJavaWithLocations(String content) {
         List<SqlCandidate> candidates = new ArrayList<>();
+        List<int[]> consumedRanges = new ArrayList<>();
         Matcher matcher = STRING_SQL_PATTERN.matcher(content);
         while (matcher.find()) {
+            if (isInsideConsumedRange(matcher.start(), consumedRanges)) {
+                continue;
+            }
             String sql = matcher.group(1).trim();
-            if (looksLikeSql(sql)) {
+            String expanded = expandConcatenatedSql(content, matcher.start(1), sql);
+            if (expanded != null && looksLikeSql(expanded)) {
+                int line = countLineNumber(content, matcher.start(1));
+                candidates.add(new SqlCandidate(expanded, line));
+                consumedRanges.add(lineRange(content, matcher.start(1)));
+            } else if (looksLikeSql(sql)) {
                 int line = countLineNumber(content, matcher.start(1));
                 candidates.add(new SqlCandidate(sql, line));
             }
@@ -192,14 +201,139 @@ public final class SqlScanSupport {
             return false;
         }
 
-        // SQL 关键字后必须跟空格
-        return upper.startsWith("SELECT ") || upper.startsWith("INSERT ") ||
-                upper.startsWith("UPDATE ") || upper.startsWith("DELETE ") ||
-                upper.startsWith("CREATE ") || upper.startsWith("ALTER ") ||
-                upper.startsWith("DROP ") || upper.startsWith("TRUNCATE ") ||
-                upper.startsWith("REPLACE ") || upper.startsWith("WITH ") ||
-                upper.startsWith("CALL ") || upper.startsWith("SHOW ") ||
-                upper.startsWith("DESC ") || upper.startsWith("DESCRIBE ");
+        String compact = upper.replaceAll("\\s+", " ");
+
+        if (compact.startsWith("SELECT ")) {
+            return true;
+        }
+        if (compact.startsWith("INSERT ")) {
+            return compact.contains(" INTO ");
+        }
+        if (compact.startsWith("UPDATE ")) {
+            return compact.contains(" SET ");
+        }
+        if (compact.startsWith("DELETE ")) {
+            return compact.contains(" FROM ");
+        }
+        if (compact.startsWith("CREATE ")) {
+            return compact.matches("^CREATE\\s+(TEMPORARY\\s+)?(TABLE|INDEX|UNIQUE\\s+INDEX|VIEW|DATABASE|SCHEMA)\\b.*");
+        }
+        if (compact.startsWith("ALTER ")) {
+            return compact.matches("^ALTER\\s+(TABLE|INDEX|DATABASE|SCHEMA)\\b.*");
+        }
+        if (compact.startsWith("DROP ")) {
+            return compact.matches("^DROP\\s+(TABLE|INDEX|VIEW|DATABASE|SCHEMA)\\b.*");
+        }
+        if (compact.startsWith("TRUNCATE ")) {
+            return compact.matches("^TRUNCATE\\s+(TABLE\\s+)?\\S+.*");
+        }
+        if (compact.startsWith("REPLACE ")) {
+            return compact.contains(" INTO ");
+        }
+        return compact.startsWith("WITH ")
+                || compact.startsWith("CALL ")
+                || compact.startsWith("SHOW ")
+                || compact.startsWith("DESC ")
+                || compact.startsWith("DESCRIBE ");
+    }
+
+    private static boolean isInsideConsumedRange(int offset, List<int[]> ranges) {
+        for (int[] range : ranges) {
+            if (offset >= range[0] && offset <= range[1]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int[] lineRange(String content, int offset) {
+        int start = content.lastIndexOf('\n', Math.max(0, offset - 1));
+        int end = content.indexOf('\n', offset);
+        return new int[] {start < 0 ? 0 : start + 1, end < 0 ? content.length() : end};
+    }
+
+    private static String expandConcatenatedSql(String content, int literalStart, String firstLiteral) {
+        int[] range = lineRange(content, literalStart);
+        String line = content.substring(range[0], range[1]);
+        if (!line.contains("+") || firstLiteral == null || !looksLikeSqlFragment(firstLiteral)) {
+            return null;
+        }
+
+        Matcher literalMatcher = STRING_LITERAL_PATTERN.matcher(line);
+        List<StringLiteralPart> parts = new ArrayList<>();
+        while (literalMatcher.find()) {
+            parts.add(new StringLiteralPart(unescapeJavaString(literalMatcher.group(1)),
+                    literalMatcher.start(),
+                    literalMatcher.end()));
+        }
+        if (parts.isEmpty()) {
+            return null;
+        }
+
+        int firstPartIndex = firstSqlLiteralIndex(parts);
+        if (firstPartIndex < 0) {
+            return null;
+        }
+
+        StringBuilder sql = new StringBuilder();
+        for (int i = firstPartIndex; i < parts.size(); i++) {
+            StringLiteralPart current = parts.get(i);
+            sql.append(current.value());
+            if (i + 1 < parts.size()) {
+                String between = line.substring(current.end(), parts.get(i + 1).start());
+                if (containsConcatenatedExpression(between)) {
+                    sql.append('?');
+                }
+            }
+        }
+
+        String tail = line.substring(parts.get(parts.size() - 1).end());
+        if (containsConcatenatedExpression(tail)) {
+            sql.append('?');
+        }
+
+        return sql.toString().replaceAll("\\s+", " ").trim();
+    }
+
+    private static int firstSqlLiteralIndex(List<StringLiteralPart> parts) {
+        for (int i = 0; i < parts.size(); i++) {
+            if (looksLikeSqlFragment(parts.get(i).value())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean containsConcatenatedExpression(String between) {
+        if (between == null || !between.contains("+")) {
+            return false;
+        }
+        String stripped = between
+                .replace("+", "")
+                .replace(")", "")
+                .replace(";", "")
+                .replace(",", "")
+                .trim();
+        return !stripped.isEmpty();
+    }
+
+    private static boolean looksLikeSqlFragment(String value) {
+        if (value == null) {
+            return false;
+        }
+        String compact = value.trim().toUpperCase().replaceAll("\\s+", " ");
+        return compact.startsWith("SELECT ")
+                || compact.startsWith("INSERT ")
+                || compact.startsWith("UPDATE ")
+                || compact.startsWith("DELETE ")
+                || compact.startsWith("CREATE ")
+                || compact.startsWith("ALTER ")
+                || compact.startsWith("DROP ")
+                || compact.startsWith("TRUNCATE ")
+                || compact.startsWith("REPLACE ")
+                || compact.startsWith("WITH ")
+                || compact.startsWith("CALL ")
+                || compact.startsWith("SHOW ");
     }
 
     /**
@@ -311,4 +445,6 @@ public final class SqlScanSupport {
     public record SqlCandidate(String sql, int line) {}
 
     public record StringLiteral(String value, int line) {}
+
+    private record StringLiteralPart(String value, int start, int end) {}
 }

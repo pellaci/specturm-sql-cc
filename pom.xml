@@ -14,7 +14,7 @@
 
     <groupId>org.spectrum</groupId>
     <artifactId>sql-checker</artifactId>
-    <version>1.0.0</version>
+    <version>1.2.0</version>
     <name>Spectrum SQL Checker</name>
     <description>SQL 质量检测工具 - 通过静态检查、动态 EXPLAIN、专家规则多维度分析 SQL 质量</description>
 

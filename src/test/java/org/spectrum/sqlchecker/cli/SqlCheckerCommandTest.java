@@ -46,7 +46,7 @@ class SqlCheckerCommandTest {
 
             assertThat(output).contains("SQL Checker");
             assertThat(output).contains("SQL Quality Detection Tool");
-            assertThat(output).contains("v2.0.0");
+            assertThat(output).contains("v1.2.0");
         }
 
         @Test
@@ -126,12 +126,12 @@ class SqlCheckerCommandTest {
         }
 
         @Test
-        @DisplayName("版本应该是 2.0.0")
+        @DisplayName("版本应该是 1.2.0")
         void should_have_correct_version() {
             picocli.CommandLine.Command annotation =
                     SqlCheckerCommand.class.getAnnotation(picocli.CommandLine.Command.class);
 
-            assertThat(annotation.version()[0]).isEqualTo("sqlchecker 2.0.0");
+            assertThat(annotation.version()[0]).isEqualTo("sqlchecker 1.2.0");
         }
 
         @Test

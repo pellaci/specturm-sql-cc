@@ -203,6 +203,32 @@ class MyBatisSqlExtractorTest {
         }
 
         @Test
+        @DisplayName("应该返回 MyBatis statement 的真实起始行号")
+        void should_return_real_statement_start_lines() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <mapper namespace="com.example.UserMapper">
+
+                    <select id="selectAll">
+                        SELECT id, name FROM users
+                    </select>
+
+                    <insert id="insertUser">
+                        INSERT INTO users (id, name) VALUES (#{id}, #{name})
+                    </insert>
+                </mapper>
+                """;
+
+            List<MyBatisSqlExtractor.LocatedSql> result = extractor.extractWithLocations(xml);
+
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).sql()).contains("SELECT id, name FROM users");
+            assertThat(result.get(0).line()).isEqualTo(4);
+            assertThat(result.get(1).sql()).contains("INSERT INTO users");
+            assertThat(result.get(1).line()).isEqualTo(8);
+        }
+
+        @Test
         @DisplayName("应该处理 CDATA 中的 SQL")
         void should_handle_cdata_sql() throws SqlExtractionException {
             String xml = """
@@ -270,7 +296,7 @@ class MyBatisSqlExtractorTest {
             List<String> result = extractor.extract(xml);
 
             assertThat(result).hasSize(1);
-            assertThat(normalizeSql(result.get(0))).contains("IN (1)");
+            assertThat(normalizeSql(result.get(0))).contains("IN (#{id})");
         }
 
         @Test
@@ -343,6 +369,95 @@ class MyBatisSqlExtractorTest {
             assertThat(result).hasSize(2);
             assertThat(result).anyMatch(sql -> sql.contains("SELECT NEXTVAL"));
             assertThat(result).anyMatch(sql -> sql.contains("INSERT INTO users"));
+        }
+
+        @Test
+        @DisplayName("应该保留 foreach 内部 CASE WHEN 片段")
+        void should_extract_foreach_body_for_case_updates() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.NativeConfigMapper">
+                    <update id="sortNativeIndex" parameterType="java.util.Map">
+                        UPDATE s_native_config_index
+                        <trim prefix="SET sort = CASE index_id" suffix="END">
+                            <foreach item="value" index="key" collection="indexMap">
+                                WHEN #{key} THEN #{value}
+                            </foreach>
+                        </trim>
+                        WHERE
+                        <foreach item="value" index="key" collection="indexMap" separator="or">
+                            index_id = #{key}
+                        </foreach>
+                    </update>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            String sql = normalizeSql(result.get(0));
+            assertThat(sql).contains("CASE index_id WHEN #{key} THEN #{value} END");
+            assertThat(sql).contains("WHERE index_id = #{key}");
+            assertThat(sql).doesNotContain("CASE index_id 1 END");
+        }
+
+        @Test
+        @DisplayName("应该保留嵌套 trim/foreach/if 中的 CASE WHEN 片段")
+        void should_extract_nested_trim_foreach_if_case_body() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.SkuMapper">
+                    <update id="batchUpdatePrices" parameterType="list">
+                        update s_sku
+                        <trim prefix="set" suffixOverrides=",">
+                            <trim prefix="jd_price =case" suffix="end,">
+                                <foreach collection="list" item="c" index="index">
+                                    <if test="c.jdPrice != null">
+                                        when jd_sku_id = #{c.jdSkuId} then #{c.jdPrice}
+                                    </if>
+                                </foreach>
+                            </trim>
+                        </trim>
+                        where
+                        <foreach collection="list" separator="or" item="c" index="index">
+                            jd_sku_id = #{c.jdSkuId}
+                        </foreach>
+                    </update>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            String sql = normalizeSql(result.get(0));
+            assertThat(sql).contains("jd_price =case when jd_sku_id = #{c.jdSkuId} then #{c.jdPrice} end");
+            assertThat(sql).doesNotContain("jd_price =case 1 end");
+        }
+
+        @Test
+        @DisplayName("应该保留 foreach 内部批量 insert values 片段")
+        void should_extract_foreach_body_for_batch_insert_values() throws SqlExtractionException {
+            String xml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+                <mapper namespace="com.example.SkuMapper">
+                    <insert id="insertSkuList" parameterType="java.util.List">
+                        INSERT INTO s_sku (id, name)
+                        VALUES
+                        <foreach collection="list" item="item" separator=",">
+                            (#{item.id}, #{item.name})
+                        </foreach>
+                    </insert>
+                </mapper>
+                """;
+
+            List<String> result = extractor.extract(xml);
+
+            assertThat(result).hasSize(1);
+            assertThat(normalizeSql(result.get(0)))
+                    .contains("VALUES (#{item.id}, #{item.name})");
         }
 
         @Test

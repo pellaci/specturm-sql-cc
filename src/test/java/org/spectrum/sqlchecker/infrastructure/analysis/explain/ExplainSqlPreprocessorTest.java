@@ -45,6 +45,17 @@ class ExplainSqlPreprocessorTest {
             assertThat(result.skipped()).isTrue();
             assertThat(result.reason()).contains("仅对可执行 EXPLAIN");
         }
+
+        @Test
+        @DisplayName("变更语句应跳过 EXPLAIN，避免误执行")
+        void should_skip_mutating_statement() {
+            String sql = "UPDATE users SET name = #{name} WHERE id = #{id}";
+
+            ExplainSqlPreprocessor.PreprocessResult result = preprocessor.preprocess(sql);
+
+            assertThat(result.skipped()).isTrue();
+            assertThat(result.reason()).contains("只读");
+        }
     }
 
     @Nested
@@ -65,13 +76,13 @@ class ExplainSqlPreprocessorTest {
         @Test
         @DisplayName("#{...} 应替换为 1")
         void should_replace_hash_placeholder() {
-            String sql = "UPDATE users SET name = #{name} WHERE id = #{id}";
+            String sql = "SELECT * FROM users WHERE name = #{name} AND id = #{id}";
 
             ExplainSqlPreprocessor.PreprocessResult result = preprocessor.preprocess(sql);
 
             assertThat(result.skipped()).isFalse();
-            assertThat(normalizeSql(result.sql())).contains("SET name = 1");
-            assertThat(normalizeSql(result.sql())).contains("WHERE id = 1");
+            assertThat(normalizeSql(result.sql())).contains("name = 1");
+            assertThat(normalizeSql(result.sql())).contains("id = 1");
         }
 
         @Test

@@ -31,7 +31,7 @@ import java.util.Set;
         name = "Avoid LIKE with leading wildcard",
         description = "LIKE 以通配符开头无法使用索引，会导致全表扫描",
         type = RuleType.PROBLEM,
-        severity = SeverityLevel.WARNING,
+        severity = SeverityLevel.CRITICAL,
         tags = {"performance", "index"},
         category = RuleCategory.PERFORMANCE
 )

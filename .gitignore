@@ -49,3 +49,7 @@ data/
 
 # Claude
 .claude/
+
+# Local agent/runtime state
+.omx/
+.github/java-upgrade/

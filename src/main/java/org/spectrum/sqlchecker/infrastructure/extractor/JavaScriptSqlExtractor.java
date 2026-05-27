@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * JavaScript/TypeScript SQL 提取器
@@ -21,18 +19,6 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class JavaScriptSqlExtractor implements SqlExtractor {
-
-    // 匹配模板字符串中的 SQL
-    private static final Pattern TEMPLATE_SQL_PATTERN = Pattern.compile(
-            "`([^`]*?(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)[^`]*?)`",
-            Pattern.CASE_INSENSITIVE
-    );
-
-    // 匹配字符串中的 SQL
-    private static final Pattern STRING_SQL_PATTERN = Pattern.compile(
-            "['\"]([^'\"]*?(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)[^'\"]*?)['\"]",
-            Pattern.CASE_INSENSITIVE
-    );
 
     @Override
     public List<String> extract(String content) throws SqlExtractionException {
@@ -73,26 +59,63 @@ public class JavaScriptSqlExtractor implements SqlExtractor {
      * 提取模板字符串中的 SQL
      */
     private void extractTemplateSqls(String content, List<String> sqls) {
-        Matcher matcher = TEMPLATE_SQL_PATTERN.matcher(content);
-        while (matcher.find()) {
-            String sql = matcher.group(1).trim();
-            if (isValidSql(sql)) {
-                sqls.add(sql);
-            }
-        }
+        extractQuotedSqls(content, sqls, '`');
     }
 
     /**
      * 提取字符串中的 SQL
      */
     private void extractStringSqls(String content, List<String> sqls) {
-        Matcher matcher = STRING_SQL_PATTERN.matcher(content);
-        while (matcher.find()) {
-            String sql = matcher.group(1).trim();
+        extractQuotedSqls(content, sqls, '"', '\'');
+    }
+
+    private void extractQuotedSqls(String content, List<String> sqls, char... quoteChars) {
+        for (int i = 0; i < content.length(); i++) {
+            char quote = content.charAt(i);
+            if (!isTargetQuote(quote, quoteChars)) {
+                continue;
+            }
+
+            int start = i + 1;
+            StringBuilder literal = new StringBuilder();
+            i = readLiteral(content, start, quote, literal);
+            if (i >= content.length()) {
+                break;
+            }
+
+            String sql = literal.toString().trim();
             if (isValidSql(sql)) {
                 sqls.add(sql);
             }
         }
+    }
+
+    private boolean isTargetQuote(char quote, char[] quoteChars) {
+        for (char quoteChar : quoteChars) {
+            if (quote == quoteChar) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int readLiteral(String content, int start, char quote, StringBuilder literal) {
+        int i = start;
+        while (i < content.length()) {
+            char c = content.charAt(i);
+            if (c == '\\' && i + 1 < content.length()) {
+                literal.append(c);
+                literal.append(content.charAt(i + 1));
+                i += 2;
+                continue;
+            }
+            if (c == quote) {
+                return i;
+            }
+            literal.append(c);
+            i++;
+        }
+        return content.length();
     }
 
     /**

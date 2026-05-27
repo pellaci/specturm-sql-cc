@@ -53,6 +53,7 @@ public class SqlPreprocessServiceImpl implements SqlPreprocessService {
         String originalSql = request.getOriginalSql();
         SqlCategory category = classifier.classify(originalSql, request.getSourceType());
         String normalizedSql = normalizer.normalize(originalSql);
+        boolean hasUnsafeTextSubstitution = containsUnsafeTextSubstitution(originalSql);
 
         SqlValidator.ValidationResult validation = validator.validate(normalizedSql);
         String candidateSql = normalizedSql;
@@ -64,6 +65,10 @@ public class SqlPreprocessServiceImpl implements SqlPreprocessService {
             errorReason = validation.valid() ? null : validation.errorReason();
         }
 
+        if (!validation.valid() && hasUnsafeTextSubstitution) {
+            errorReason = unsafeTextSubstitutionReason();
+        }
+
         ExplainEligibility eligibility = ExplainEligibility.SKIPPED;
         String explainSql = null;
         if (request.isExplainEnabled()) {
@@ -73,9 +78,12 @@ public class SqlPreprocessServiceImpl implements SqlPreprocessService {
             if (errorReason == null && buildResult.reason() != null) {
                 errorReason = buildResult.reason();
             }
+            if (hasUnsafeTextSubstitution && buildResult.reason() != null) {
+                errorReason = buildResult.reason() + "；请改用 #{} 参数绑定或白名单映射";
+            }
         }
 
-        ValidityStatus validity = validation.valid() ? ValidityStatus.VALID : ValidityStatus.INVALID;
+        ValidityStatus validity = resolveValidity(validation.valid(), hasUnsafeTextSubstitution);
         PreprocessResult result = PreprocessResult.builder()
             .sqlId(request.getSqlId())
             .category(category)
@@ -112,5 +120,20 @@ public class SqlPreprocessServiceImpl implements SqlPreprocessService {
             }
         }
         return current;
+    }
+
+    private boolean containsUnsafeTextSubstitution(String sql) {
+        return sql != null && sql.contains("${");
+    }
+
+    private ValidityStatus resolveValidity(boolean valid, boolean hasUnsafeTextSubstitution) {
+        if (hasUnsafeTextSubstitution) {
+            return ValidityStatus.UNKNOWN;
+        }
+        return valid ? ValidityStatus.VALID : ValidityStatus.INVALID;
+    }
+
+    private String unsafeTextSubstitutionReason() {
+        return "包含 ${} 文本占位符，无法安全静态归一化；请改用 #{} 参数绑定或白名单映射";
     }
 }

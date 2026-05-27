@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * MyBatis XML SQL 提取器
@@ -33,15 +35,22 @@ public class MyBatisSqlExtractor implements SqlExtractor {
             "select", "insert", "update", "delete", "selectkey"
     );
 
+    public record LocatedSql(String sql, int line) {
+    }
+
     @Override
     public List<String> extract(String content) throws SqlExtractionException {
-        List<String> sqls = new ArrayList<>();
+        return extractWithLocations(content).stream()
+                .map(LocatedSql::sql)
+                .toList();
+    }
 
+    public List<LocatedSql> extractWithLocations(String content) throws SqlExtractionException {
         try {
             Document doc = Jsoup.parse(content, "", org.jsoup.parser.Parser.xmlParser());
 
             Map<String, String> sqlFragments = extractSqlFragments(doc);
-            extractSqlStatements(doc, sqlFragments, sqls);
+            List<LocatedSql> sqls = extractSqlStatements(doc, sqlFragments, content);
 
             log.debug("Extracted {} SQL statements from MyBatis XML", sqls.size());
             return sqls;
@@ -91,24 +100,25 @@ public class MyBatisSqlExtractor implements SqlExtractor {
     /**
      * 提取 SQL 语句
      */
-    private void extractSqlStatements(Document doc, Map<String, String> fragments, List<String> sqls) {
-        for (String tag : SQL_STATEMENT_ELEMENTS) {
-            Elements elements = doc.select(tag);
-            for (Element element : elements) {
-                boolean skipSelectKey = !"selectkey".equals(tag);
-                String sql = extractSqlFromElement(element, fragments, 0, skipSelectKey).trim();
-                if (tag.equals("select") && !startsWithSelect(sql)) {
-                    sql = "SELECT " + sql;
-                }
-                if (isValidSql(sql)) {
-                    sqls.add(sql.trim());
-                }
+    private List<LocatedSql> extractSqlStatements(Document doc, Map<String, String> fragments, String content) {
+        List<LocatedSql> sqls = new ArrayList<>();
+        Elements elements = doc.select(String.join(",", SQL_STATEMENT_ELEMENTS));
+        for (Element element : elements) {
+            String tag = element.tagName().toLowerCase(Locale.ROOT);
+            boolean skipSelectKey = !"selectkey".equals(tag);
+            String sql = extractSqlFromElement(element, fragments, 0, skipSelectKey).trim();
+            if (tag.equals("select") && !startsWithSelect(sql)) {
+                sql = "SELECT " + sql;
+            }
+            if (isValidSql(sql)) {
+                sqls.add(new LocatedSql(sql.trim(), findElementLine(content, tag, element)));
             }
         }
+        return sqls;
     }
 
     private String extractSqlFromElement(Element element, Map<String, String> fragments, int depth, boolean skipSelectKey) {
-        if (depth > 5) {
+        if (depth > 12) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
@@ -135,7 +145,7 @@ public class MyBatisSqlExtractor implements SqlExtractor {
                 } else if ("choose".equals(tagName)) {
                     sb.append(extractSqlFromChoose(child, fragments, depth + 1, skipSelectKey)).append(" ");
                 } else if ("foreach".equals(tagName)) {
-                    sb.append(extractSqlFromForeach(child)).append(" ");
+                    sb.append(extractSqlFromForeach(child, fragments, depth + 1, skipSelectKey)).append(" ");
                 } else if ("where".equals(tagName)) {
                     sb.append(extractSqlFromWhere(child, fragments, depth + 1)).append(" ");
                 } else if ("set".equals(tagName)) {
@@ -173,14 +183,21 @@ public class MyBatisSqlExtractor implements SqlExtractor {
         return otherwiseSql.trim();
     }
 
-    private String extractSqlFromForeach(Element foreachElement) {
+    private String extractSqlFromForeach(Element foreachElement,
+                                         Map<String, String> fragments,
+                                         int depth,
+                                         boolean skipSelectKey) {
         String open = foreachElement.attr("open");
         String close = foreachElement.attr("close");
+        String inner = extractSqlFromElement(foreachElement, fragments, depth + 1, skipSelectKey);
+        if (inner.isBlank()) {
+            inner = "1";
+        }
         StringBuilder sb = new StringBuilder();
         if (open != null && !open.isBlank()) {
             sb.append(open);
         }
-        sb.append("1");
+        sb.append(inner.trim());
         if (close != null && !close.isBlank()) {
             sb.append(close);
         }
@@ -250,6 +267,39 @@ public class MyBatisSqlExtractor implements SqlExtractor {
         }
         String upper = sql.trim().toUpperCase(Locale.ROOT);
         return upper.startsWith("SELECT") || upper.startsWith("WITH") || upper.startsWith("EXPLAIN");
+    }
+
+    private int findElementLine(String content, String tag, Element element) {
+        if (content == null || content.isBlank()) {
+            return 1;
+        }
+        String id = element.attr("id");
+        if (id != null && !id.isBlank()) {
+            Matcher byId = Pattern.compile("(?is)<\\s*" + Pattern.quote(tag)
+                    + "\\b(?=[^>]*\\bid\\s*=\\s*(['\"])"
+                    + Pattern.quote(id)
+                    + "\\1)[^>]*>").matcher(content);
+            if (byId.find()) {
+                return countLineNumber(content, byId.start());
+            }
+        }
+
+        Matcher byTag = Pattern.compile("(?is)<\\s*" + Pattern.quote(tag) + "\\b[^>]*>").matcher(content);
+        if (byTag.find()) {
+            return countLineNumber(content, byTag.start());
+        }
+        return 1;
+    }
+
+    private int countLineNumber(String content, int offset) {
+        int line = 1;
+        int safeOffset = Math.min(Math.max(offset, 0), content.length());
+        for (int i = 0; i < safeOffset; i++) {
+            if (content.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
     }
 
     private String stripLeadingLogicalOperators(String sql) {

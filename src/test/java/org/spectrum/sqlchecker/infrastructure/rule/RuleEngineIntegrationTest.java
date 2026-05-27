@@ -26,9 +26,7 @@ class RuleEngineIntegrationTest {
     @Test
     @DisplayName("应该注册至少 15 条规则")
     void should_register_at_least_15_rules() {
-        int ruleCount = ruleRegistry.getRuleCount();
-        System.out.println("Registered rules: " + ruleCount);
-        assertThat(ruleCount).isGreaterThanOrEqualTo(15);
+        assertThat(ruleRegistry.getRuleCount()).isGreaterThanOrEqualTo(15);
     }
 
     @Test
@@ -52,16 +50,9 @@ class RuleEngineIntegrationTest {
     void should_analyze_sql_correctly() {
         var issues = ruleEngine.analyze("test-1", "SELECT * FROM users");
 
-        System.out.println("Issues found: " + issues.size());
-        issues.forEach(issue -> {
-            System.out.println("  - " + issue.getRuleId() + ": " + issue.getMessage());
-        });
-
-        // 应该检测到 SELECT * 问题
-        assertThat(issues).anyMatch(issue ->
-            "select-star".equals(issue.getRuleId()) ||
-            "SELECT_STAR".equals(issue.getRuleId())
-        );
+        assertThat(issues)
+                .extracting("ruleId")
+                .containsExactlyInAnyOrder("select-star", "missing-where");
     }
 
     @Test
@@ -69,15 +60,9 @@ class RuleEngineIntegrationTest {
     void should_detect_like_leading_wildcard() {
         var issues = ruleEngine.analyze("test-like", "SELECT * FROM users WHERE name LIKE '%test'");
 
-        System.out.println("LIKE issues found: " + issues.size());
-        issues.forEach(issue -> {
-            System.out.println("  - " + issue.getRuleId() + ": " + issue.getMessage());
-        });
-
-        // 应该检测到 LIKE 前缀通配符问题
-        assertThat(issues).anyMatch(issue ->
-            issue.getRuleId().contains("like") || issue.getRuleId().contains("LIKE")
-        );
+        assertThat(issues)
+                .extracting("ruleId")
+                .containsExactlyInAnyOrder("select-star", "like-leading-wildcard");
     }
 
     @Test
@@ -85,15 +70,8 @@ class RuleEngineIntegrationTest {
     void should_detect_orderby_without_limit() {
         var issues = ruleEngine.analyze("test-orderby", "SELECT id FROM users ORDER BY created_at");
 
-        System.out.println("ORDER BY issues found: " + issues.size());
-        issues.forEach(issue -> {
-            System.out.println("  - " + issue.getRuleId() + ": " + issue.getMessage());
-        });
-
-        // 应该检测到 ORDER BY 无 LIMIT 问题
-        assertThat(issues).anyMatch(issue ->
-            issue.getRuleId().contains("orderby") || issue.getRuleId().contains("ORDER") ||
-            issue.getRuleId().contains("limit") || issue.getRuleId().contains("LIMIT")
-        );
+        assertThat(issues)
+                .extracting("ruleId")
+                .containsExactlyInAnyOrder("missing-where", "orderby-without-limit");
     }
 }

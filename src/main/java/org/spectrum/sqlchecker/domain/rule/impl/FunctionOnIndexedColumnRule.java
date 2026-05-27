@@ -34,7 +34,7 @@ import java.util.Set;
         name = "Function on indexed column in WHERE",
         description = "在索引列上使用函数会导致无法使用索引（非 SARGable 查询）",
         type = RuleType.PROBLEM,
-        severity = SeverityLevel.WARNING,
+        severity = SeverityLevel.CRITICAL,
         tags = {"performance", "index", "sargable"},
         category = RuleCategory.PERFORMANCE
 )

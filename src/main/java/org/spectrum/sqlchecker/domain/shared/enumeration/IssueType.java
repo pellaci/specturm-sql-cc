@@ -11,6 +11,7 @@ public enum IssueType {
     // SELECT 相关
     SELECT_STAR,
     SELECT_WITHOUT_WHERE,
+    ORDER_BY_WITHOUT_LIMIT,
 
     // 索引相关
     MISSING_INDEX,
@@ -32,6 +33,8 @@ public enum IssueType {
     DYNAMIC_SQL,
 
     // 其他
+    UNKNOWN,
+    SQL_SYNTAX_ERROR,
     TOO_MANY_JOINS,
     LIKE_LEADING_WILDCARD
 }

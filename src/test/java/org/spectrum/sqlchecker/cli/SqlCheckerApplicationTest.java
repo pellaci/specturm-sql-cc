@@ -1,10 +1,17 @@
 package org.spectrum.sqlchecker.cli;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -16,6 +23,26 @@ import static org.assertj.core.api.Assertions.*;
  */
 @DisplayName("SqlCheckerApplication 单元测试")
 class SqlCheckerApplicationTest {
+
+    private Map<String, String> originalProperties;
+
+    @BeforeEach
+    void captureSystemProperties() {
+        originalProperties = new HashMap<>();
+        SqlCheckerApplication.QUIET_DEFAULT_PROPERTIES.keySet()
+                .forEach(key -> originalProperties.put(key, System.getProperty(key)));
+    }
+
+    @AfterEach
+    void restoreSystemProperties() {
+        originalProperties.forEach((key, value) -> {
+            if (value == null) {
+                System.clearProperty(key);
+            } else {
+                System.setProperty(key, value);
+            }
+        });
+    }
 
     @Nested
     @DisplayName("类注解测试")
@@ -85,6 +112,47 @@ class SqlCheckerApplicationTest {
                     SqlCheckerApplication.class.getAnnotation(SpringBootApplication.class);
 
             assertThat(annotation).isNotNull();
+        }
+
+        @Test
+        @DisplayName("CLI quiet 默认值不应该覆盖用户显式系统属性")
+        void should_not_override_explicit_system_properties() {
+            System.setProperty("debug", "true");
+            System.setProperty("logging.level.root", "DEBUG");
+            System.clearProperty("logging.level.org.springframework");
+            System.clearProperty("logging.level.org.spectrum.sqlchecker");
+
+            SqlCheckerApplication.applyQuietSystemPropertyDefaults();
+
+            assertThat(System.getProperty("debug")).isEqualTo("true");
+            assertThat(System.getProperty("logging.level.root")).isEqualTo("DEBUG");
+            assertThat(System.getProperty("logging.level.org.springframework")).isEqualTo("WARN");
+            assertThat(System.getProperty("logging.level.org.spectrum.sqlchecker")).isEqualTo("WARN");
+        }
+
+        @Test
+        @DisplayName("CLI 配置应该关闭 banner 和启动日志并设置默认属性")
+        void should_configure_spring_application_for_cli() throws Exception {
+            SpringApplication app = new SpringApplication(SqlCheckerApplication.class);
+
+            SqlCheckerApplication.configureForCli(app);
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> defaultProperties = (Map<String, Object>) getField(app, "defaultProperties");
+
+            assertThat(getField(app, "bannerMode").toString()).isEqualTo("OFF");
+            assertThat(getField(app, "logStartupInfo")).isEqualTo(false);
+            assertThat(defaultProperties)
+                    .containsEntry("logging.level.root", "WARN")
+                    .containsEntry("logging.level.org.springframework", "WARN")
+                    .containsEntry("logging.level.org.spectrum.sqlchecker", "WARN")
+                    .containsEntry("debug", "false");
+        }
+
+        private Object getField(Object target, String fieldName) throws Exception {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.get(target);
         }
     }
 

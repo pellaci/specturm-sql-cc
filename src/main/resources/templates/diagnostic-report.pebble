@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Diagnostic Report - {{ report.metadata.projectName }}</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f6f8;
+            --panel: #ffffff;
+            --panel-soft: #fafbfc;
+            --text: #1d2733;
+            --muted: #667085;
+            --muted-strong: #475467;
+            --line: #d9e0e8;
+            --line-soft: #e8edf3;
+            --ink: #101828;
+            --accent: #2f5d62;
+            --accent-soft: #e8f2f1;
+            --critical: #b42318;
+            --critical-soft: #fff1f0;
+            --warning: #a15c07;
+            --warning-soft: #fff7e6;
+            --info: #175cd3;
+            --info-soft: #eff6ff;
+            --healthy: #067647;
+            --healthy-soft: #ecfdf3;
+            --code-bg: #111827;
+            --code-text: #e5e7eb;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.55;
+        }
+        .shell { max-width: 1360px; margin: 0 auto; padding: 32px 24px 56px; }
+        section { scroll-margin-top: 24px; }
+        .topline {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            align-items: flex-start;
+            padding: 30px 0 26px;
+            border-bottom: 1px solid var(--line);
+        }
+        .kicker {
+            margin: 0 0 8px;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 750;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+        h1 { margin: 0 0 10px; font-size: 34px; letter-spacing: 0; color: var(--ink); }
+        h2 { margin: 0; font-size: 20px; letter-spacing: 0; color: var(--ink); }
+        h3 { margin: 0; font-size: 15px; letter-spacing: 0; color: var(--ink); }
+        .muted { color: var(--muted); }
+        .meta-line { margin-top: 4px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+        .risk-card {
+            min-width: 220px;
+            padding: 18px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 6px;
+        }
+        .risk-card .label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 650;
+            text-transform: uppercase;
+        }
+        .risk-card .score {
+            margin-top: 2px;
+            color: var(--ink);
+            font-size: 44px;
+            font-weight: 780;
+            line-height: 1;
+        }
+        .grid { display: grid; gap: 16px; }
+        .report-layout {
+            display: grid;
+            grid-template-columns: 190px minmax(0, 1fr);
+            gap: 22px;
+            align-items: start;
+            margin-top: 24px;
+        }
+        .toc {
+            position: sticky;
+            top: 18px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            padding: 14px;
+            border-radius: 6px;
+        }
+        .toc-title {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 760;
+            text-transform: uppercase;
+        }
+        .toc a {
+            display: block;
+            padding: 8px 9px;
+            color: var(--muted-strong);
+            text-decoration: none;
+            font-size: 13px;
+            border-radius: 4px;
+        }
+        .toc a:hover { background: var(--accent-soft); color: var(--accent); }
+        .report-main { min-width: 0; }
+        .metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0 0 16px; }
+        .metric, .panel, .finding, .priority-item, .executive-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+        }
+        .metric { padding: 18px; }
+        .metric .value { color: var(--ink); font-size: 28px; font-weight: 760; }
+        .metric .label { margin-top: 5px; color: var(--muted); font-size: 13px; }
+        .decision-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 26px;
+        }
+        .decision-card {
+            padding: 14px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            border-radius: 6px;
+            min-width: 0;
+        }
+        .decision-card span {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 680;
+        }
+        .decision-card strong {
+            display: block;
+            margin-top: 4px;
+            color: var(--ink);
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .section {
+            margin: 26px 0;
+        }
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: end;
+            margin-bottom: 14px;
+        }
+        .section-subtitle {
+            margin: 5px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .executive-grid { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr); }
+        .executive-panel { padding: 20px; min-width: 0; }
+        .verdict-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .verdict-copy {
+            color: var(--muted-strong);
+            font-size: 15px;
+        }
+        .next-steps {
+            margin: 16px 0 0;
+            padding-left: 22px;
+        }
+        .next-steps li { margin: 7px 0; color: var(--muted-strong); }
+        .next-steps-title { margin-top: 16px; }
+        .gate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .gate {
+            padding: 12px;
+            border: 1px solid var(--line-soft);
+            background: var(--panel-soft);
+            border-radius: 5px;
+        }
+        .gate span { display: block; color: var(--muted); font-size: 12px; }
+        .gate strong { display: block; margin-top: 4px; color: var(--ink); font-size: 20px; }
+        .columns { grid-template-columns: 1.15fr 1fr 1fr; }
+        .insights { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .panel { padding: 18px; min-width: 0; }
+        .panel-note {
+            margin: 6px 0 12px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .insight-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .insight-item {
+            border-top: 1px solid var(--line-soft);
+            padding-top: 11px;
+            margin-top: 11px;
+        }
+        .insight-item:first-of-type { border-top: 0; padding-top: 0; }
+        .insight-id {
+            margin-bottom: 4px;
+            color: var(--ink);
+            font-weight: 680;
+            overflow-wrap: anywhere;
+        }
+        .insight-evidence {
+            color: var(--muted);
+            font-size: 12px;
+            overflow-wrap: anywhere;
+        }
+        .bar-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 52px;
+            gap: 12px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .bar-track { height: 8px; background: #eef2f7; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--accent); }
+        .stat-label {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 13px;
+            color: var(--muted-strong);
+        }
+        .stat-count { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+        .priority-list { display: grid; gap: 12px; }
+        .report-action {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--accent);
+            padding: 9px 12px;
+            min-height: 38px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .report-action:hover { background: var(--accent-soft); }
+        .priority-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 180px;
+            gap: 18px;
+            padding: 18px;
+        }
+        .priority-title {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .priority-id { font-weight: 720; color: var(--ink); overflow-wrap: anywhere; }
+        .priority-meta { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+        .priority-issue {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--line-soft);
+        }
+        .action-link {
+            display: inline-flex;
+            margin-top: 12px;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 13px;
+            text-decoration: none;
+        }
+        .action-link:hover { text-decoration: underline; }
+        .field {
+            display: grid;
+            grid-template-columns: 54px minmax(0, 1fr);
+            gap: 10px;
+            margin-top: 7px;
+            color: var(--muted-strong);
+            font-size: 13px;
+        }
+        .field span {
+            color: var(--muted);
+            font-weight: 650;
+        }
+        .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 18px; }
+        input, select {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            padding: 10px 12px;
+            min-height: 40px;
+            font: inherit;
+            border-radius: 5px;
+        }
+        input { min-width: 280px; flex: 1; }
+        .filter-panel {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            padding: 14px;
+            margin-bottom: 16px;
+            border-radius: 6px;
+        }
+        .filter-summary {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .filter-summary strong { color: var(--ink); }
+        .interaction-status {
+            margin-top: 8px;
+            color: var(--warning);
+            font-size: 12px;
+        }
+        .interaction-status.ready { color: var(--healthy); }
+        .rule-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .rule-filters-label {
+            flex: 0 0 100%;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 720;
+        }
+        .filter-chip {
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+            color: var(--muted-strong);
+            border-radius: 999px;
+            padding: 6px 10px;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .filter-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+        .finding { margin-bottom: 14px; padding: 18px; }
+        body:not(.interactive-ready) .finding[data-has-issue="false"] { display: none; }
+        .finding-head {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 16px;
+            align-items: start;
+        }
+        .finding h3 { margin-top: 2px; overflow-wrap: anywhere; }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+            color: var(--muted-strong);
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: 650;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+        .sev-CRITICAL { color: var(--critical); border-color: #fecaca; background: var(--critical-soft); }
+        .sev-WARNING { color: var(--warning); border-color: #fedf89; background: var(--warning-soft); }
+        .sev-INFO { color: var(--info); border-color: #bfdbfe; background: var(--info-soft); }
+        .sev-HEALTHY { color: var(--healthy); border-color: #bbf7d0; background: var(--healthy-soft); }
+        .verdict-CRITICAL { border-left: 4px solid var(--critical); }
+        .verdict-WARNING { border-left: 4px solid var(--warning); }
+        .verdict-INFO { border-left: 4px solid var(--info); }
+        .verdict-HEALTHY { border-left: 4px solid var(--healthy); }
+        pre {
+            margin: 14px 0;
+            padding: 14px;
+            background: var(--code-bg);
+            color: var(--code-text);
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .sql-block-label {
+            margin: 12px 14px -4px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 720;
+            text-transform: uppercase;
+        }
+        .issue {
+            border-top: 1px solid var(--line-soft);
+            padding-top: 13px;
+            margin-top: 13px;
+        }
+        .issue-title {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+        }
+        .issue-message { margin-top: 4px; color: var(--ink); font-weight: 650; }
+        .locations { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+        .mini-score {
+            min-width: 118px;
+            padding: 12px;
+            border: 1px solid var(--line-soft);
+            background: var(--panel-soft);
+            text-align: right;
+        }
+        .mini-score span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+        .mini-score strong { display: block; color: var(--ink); font-size: 24px; line-height: 1.1; }
+        .sql-detail {
+            margin-top: 14px;
+            border: 1px solid var(--line-soft);
+            background: var(--panel-soft);
+            border-radius: 6px;
+        }
+        .sql-detail summary {
+            cursor: pointer;
+            padding: 12px 14px;
+            color: var(--ink);
+            font-weight: 720;
+        }
+        .sql-tools {
+            display: flex;
+            justify-content: flex-end;
+            padding: 0 12px 10px;
+        }
+        .copy-sql {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--accent);
+            border-radius: 5px;
+            padding: 7px 10px;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 750;
+            cursor: pointer;
+        }
+        .copy-sql:hover { background: var(--accent-soft); }
+        .empty {
+            padding: 24px;
+            color: var(--muted);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+        }
+        @media (max-width: 1100px) {
+            .report-layout { grid-template-columns: 1fr; }
+            .toc { position: static; display: flex; flex-wrap: wrap; gap: 4px; }
+            .toc-title { flex: 0 0 100%; }
+            .metrics, .decision-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 920px) {
+            .topline, .section-head, .finding-head { display: block; }
+            .risk-card { margin-top: 18px; }
+            .columns, .insights, .executive-grid, .priority-item { grid-template-columns: 1fr; }
+            .gate-grid { grid-template-columns: 1fr 1fr; }
+            .mini-score { margin-top: 12px; text-align: left; }
+            input { min-width: 100%; }
+        }
+        @media (max-width: 560px) {
+            .shell { padding: 22px 14px 40px; }
+            h1 { font-size: 28px; }
+            .metrics, .decision-strip { grid-template-columns: 1fr; }
+            .gate-grid { grid-template-columns: 1fr; }
+            .field { grid-template-columns: 1fr; gap: 2px; }
+        }
+        @media print {
+            body { background: #ffffff; }
+            .shell { max-width: none; padding: 0; }
+            .toolbar, .toc, .filter-panel, script { display: none; }
+            .panel, .metric, .finding, .priority-item, .executive-panel, .risk-card { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+<main class="shell">
+    <section class="topline">
+        <div>
+            <p class="kicker">SQL Checker / Diagnostic Report</p>
+            <h1>{{ report.metadata.projectName }} SQL 诊断报告</h1>
+            <div class="meta-line">扫描范围：{{ report.metadata.scanPath }}</div>
+            <div class="meta-line">生成时间：{{ report.metadata.generatedAt }} · 扫描耗时：{{ report.metadata.durationMs }}ms · 报告版本：{{ report.metadata.reportVersion }}</div>
+        </div>
+        <div class="risk-card verdict-{{ report.summary.riskLevel }}">
+            <div class="label">综合评分</div>
+            <div class="score">{{ report.summary.score }}</div>
+            <span class="badge sev-{{ report.summary.riskLevel }}">{{ report.summary.riskLevel }}</span>
+        </div>
+    </section>
+
+    <div class="report-layout">
+        <aside class="toc" aria-label="报告目录">
+            <p class="toc-title">Report Map</p>
+            <a href="#overview">总览</a>
+            <a href="#brief">审计结论</a>
+            <a href="#queue">修复队列</a>
+            <a href="#hotspots">风险热点</a>
+            <a href="#insights">诊断洞察</a>
+            <a href="#details">SQL 明细</a>
+        </aside>
+        <div class="report-main">
+
+    <section id="overview" class="grid metrics">
+        <div class="metric"><div class="value">{{ report.summary.counts.totalFiles }}</div><div class="label">扫描文件</div></div>
+        <div class="metric"><div class="value">{{ report.summary.counts.uniqueSql }}</div><div class="label">唯一 SQL / 总发现 {{ report.summary.counts.totalSql }}</div></div>
+        <div class="metric"><div class="value">{{ report.summary.counts.totalIssues }}</div><div class="label">问题总数：C {{ report.summary.counts.criticalIssues }} / W {{ report.summary.counts.warningIssues }} / I {{ report.summary.counts.infoIssues }}</div></div>
+        <div class="metric"><div class="value">{{ report.summary.coverage.parseRate|numberFormat }}%</div><div class="label">解析覆盖率</div></div>
+        <div class="metric"><div class="value">{{ report.summary.coverage.explainCoverage|numberFormat }}%</div><div class="label">EXPLAIN 覆盖率</div></div>
+    </section>
+
+    <section class="decision-strip" aria-label="关键处置摘要">
+        <div class="decision-card">
+            <span>当前处置级别</span>
+            <strong>{{ report.summary.riskLevel }} · Score {{ report.summary.score }}</strong>
+        </div>
+        <div class="decision-card">
+            <span>优先规则</span>
+            <strong>
+                {% for item in report.hotspots.byRule %}
+                    {% if loop.first %}{{ item.label }}{% endif %}
+                {% else %}
+                    暂无触发规则
+                {% endfor %}
+            </strong>
+        </div>
+        <div class="decision-card">
+            <span>优先文件</span>
+            <strong>
+                {% for item in report.hotspots.byFile %}
+                    {% if loop.first %}{{ item.label }}{% endif %}
+                {% else %}
+                    暂无热点文件
+                {% endfor %}
+            </strong>
+        </div>
+        <div class="decision-card">
+            <span>下一步</span>
+            <strong>{% if report.summary.counts.criticalIssues > 0 %}先清 Critical{% elseif report.summary.counts.warningIssues > 0 %}收敛 Warning 热点{% else %}保留基线并接入流水线{% endif %}</strong>
+        </div>
+    </section>
+
+    <section id="brief" class="section">
+        <div class="grid executive-grid">
+            <div class="executive-panel verdict-{{ report.summary.riskLevel }}">
+                <div class="section-head">
+                    <div>
+                        <p class="kicker">Executive Brief</p>
+                        <h2>审计结论</h2>
+                    </div>
+                </div>
+                <div class="verdict-title">
+                    <span class="badge sev-{{ report.summary.riskLevel }}">{{ report.summary.riskLevel }}</span>
+                    <h3>当前 SQL 风险等级为 {{ report.summary.riskLevel }}</h3>
+                </div>
+                <div class="verdict-copy">
+                    {% if report.summary.riskLevel == 'CRITICAL' %}
+                        存在阻断级 SQL 风险。建议先处理 Critical 问题，尤其是危险 DML、潜在注入和会扩大数据扫描面的 SQL，再进入性能与规范治理。
+                    {% elseif report.summary.riskLevel == 'WARNING' %}
+                        存在需要纳入迭代治理的 SQL 风险。建议优先处理高频规则和高热文件，并补齐可解释执行计划覆盖。
+                    {% elseif report.summary.riskLevel == 'INFO' %}
+                        当前未发现高危问题，但仍有可优化项。建议持续关注重复 SQL、模板待确认和缺少 EXPLAIN 证据的语句。
+                    {% else %}
+                        当前扫描未发现显著 SQL 风险。建议保留报告 JSON 作为后续基线，并在变更流水线中持续运行。
+                    {% endif %}
+                </div>
+                <h3 class="next-steps-title">建议处置顺序</h3>
+                <ol class="next-steps">
+                    <li><strong>先处理 Critical</strong>：危险 DML、SQL 注入风险、会导致线上事故的无约束变更语句。</li>
+                    <li><strong>再处理热点</strong>：从 Top 风险文件和 Top 规则开始，优先修复集中爆发的问题。</li>
+                    <li><strong>补齐证据</strong>：对关键查询启用安全 EXPLAIN，确认是否存在全表扫描、索引缺失或扫描行数异常。</li>
+                </ol>
+            </div>
+            <div class="executive-panel">
+                <p class="kicker">Quality Gate</p>
+                <h2>质量门禁</h2>
+                <p class="section-subtitle">用于判断这份报告是否可以支撑修复决策。</p>
+                <div class="gate-grid" style="margin-top:14px;">
+                    <div class="gate"><span>解析覆盖率</span><strong>{{ report.summary.coverage.parseRate|numberFormat }}%</strong></div>
+                    <div class="gate"><span>EXPLAIN 覆盖率</span><strong>{{ report.summary.coverage.explainCoverage|numberFormat }}%</strong></div>
+                    <div class="gate"><span>需人工确认 SQL</span><strong>{{ report.diagnostics.manualReview|length }}</strong></div>
+                    <div class="gate"><span>EXPLAIN 跳过</span><strong>{{ report.diagnostics.skippedExplain|length }}</strong></div>
+                    <div class="gate"><span>EXPLAIN 异常</span><strong>{{ report.diagnostics.configWarnings|length }}</strong></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="queue" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Remediation Queue</p>
+                <h2>优先修复队列</h2>
+                <p class="section-subtitle">默认展示前 12 条问题，聚焦位置、原因、建议和证据。完整清单见 SQL 明细。</p>
+            </div>
+            <button id="priorityToggle" class="report-action" type="button">展开全部问题</button>
+        </div>
+        {% if report.summary.counts.totalIssues > 0 %}
+            <div class="priority-list">
+                {% for finding in report.findings %}
+                    {% if finding.issues is not empty %}
+                        <article class="priority-item">
+                            <div>
+                                <div class="priority-title">
+                                    <span class="badge sev-{{ finding.severity }}">{{ finding.severity }}</span>
+                                    <span class="badge">{{ finding.sqlType }}</span>
+                                    <span class="priority-id">{{ finding.id }}</span>
+                                </div>
+                                <div class="priority-meta">
+                                    {% for loc in finding.locations %}
+                                        {{ loc.filePath }}:{{ loc.startLine }} · {{ loc.sourceType }}{% if not loop.last %}<br>{% endif %}
+                                    {% else %}
+                                        未记录位置
+                                    {% endfor %}
+                                </div>
+                                {% for issue in finding.issues %}
+                                    <div class="priority-issue">
+                                        <span class="badge">{{ issue.source }}</span>
+                                        <span class="badge sev-{{ issue.severity }}">{{ issue.type }}</span>
+                                        <div class="field"><span>原因</span><div>{{ issue.message }}</div></div>
+                                        {% if issue.suggestion is not null and issue.suggestion is not empty %}
+                                            <div class="field"><span>建议</span><div>{{ issue.suggestion }}</div></div>
+                                        {% endif %}
+                                        {% if issue.evidence is not null and issue.evidence is not empty %}
+                                            <div class="field"><span>证据</span><div>{{ issue.evidence }}</div></div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div>
+                                <div class="mini-score"><span>Score</span><strong>{{ finding.score }}</strong></div>
+                                <a class="action-link" href="#finding-{{ finding.id }}">查看明细</a>
+                            </div>
+                        </article>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty">未触发问题 SQL。建议保留 JSON 基线，并将本报告纳入后续变更检查。</div>
+        {% endif %}
+    </section>
+
+    <section id="hotspots" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Hotspots</p>
+                <h2>风险热点</h2>
+                <p class="section-subtitle">用于定位先修哪里、哪类规则最集中、问题严重度如何分布。</p>
+            </div>
+        </div>
+        <div class="grid columns">
+            <div class="panel">
+                <h3>Top 风险文件</h3>
+                <div class="panel-note">条形按最高风险文件归一，数量为问题位置加权计数。</div>
+                {% for item in report.hotspots.byFile %}
+                    <div class="bar-row">
+                        <div>
+                            <div class="stat-label" title="{{ item.label }}">{{ item.label }}</div>
+                            <div class="bar-track"><div class="bar-fill" style="width: {{ item.ratio|numberFormat }}%"></div></div>
+                        </div>
+                        <div class="stat-count">{{ item.count }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">暂无热点文件</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <h3>Top 规则</h3>
+                {% for item in report.hotspots.byRule %}
+                    <div class="bar-row">
+                        <div>
+                            <div class="stat-label" title="{{ item.label }}">{{ item.label }}</div>
+                            <div class="bar-track"><div class="bar-fill" style="width: {{ item.ratio|numberFormat }}%"></div></div>
+                        </div>
+                        <div class="stat-count">{{ item.count }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">未触发规则</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <h3>严重级别</h3>
+                {% for item in report.hotspots.bySeverity %}
+                    <div class="bar-row">
+                        <div>
+                            <span class="badge sev-{{ item.severity }}">{{ item.label }}</span>
+                            <div class="bar-track"><div class="bar-fill" style="width: {{ item.ratio|numberFormat }}%"></div></div>
+                        </div>
+                        <div class="stat-count">{{ item.count }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section id="insights" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Insights</p>
+                <h2>诊断洞察</h2>
+                <p class="section-subtitle">把重复、模板待确认、安全跳过和执行计划风险拆成可追踪线索。</p>
+            </div>
+        </div>
+        <div class="grid insights">
+            <div class="panel">
+                <div class="insight-title"><h3>重复 SQL</h3></div>
+                {% for item in report.insights.duplicateSql %}
+                    <div class="insight-item">
+                        <div class="insight-id">{{ item.id }}</div>
+                        <span class="badge sev-{{ item.severity }}">{{ item.count }} 处</span>
+                        <div class="insight-evidence">{{ item.evidence }}</div>
+                        <div class="insight-evidence">
+                            {% for location in item.locations %}
+                                {{ location }}{% if not loop.last %}<br>{% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="muted">未发现重复 SQL</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <div class="insight-title"><h3>解析 / 模板待确认</h3></div>
+                {% for item in report.insights.parseFailures %}
+                    <div class="insight-item">
+                        <div class="insight-id">{{ item.id }}</div>
+                        <span class="badge">{{ item.title }}</span>
+                        <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
+                        <div class="insight-evidence">{{ item.evidence }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">解析通过</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <div class="insight-title"><h3>EXPLAIN 跳过</h3></div>
+                {% for item in report.insights.skippedExplain %}
+                    <div class="insight-item">
+                        <div class="insight-id">{{ item.id }}</div>
+                        <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
+                        <div class="insight-evidence">{{ item.evidence }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">可执行 SQL 已覆盖</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <div class="insight-title"><h3>危险 DML</h3></div>
+                {% for item in report.insights.dangerousDml %}
+                    <div class="insight-item">
+                        <div class="insight-id">{{ item.id }}</div>
+                        <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
+                        <div class="insight-evidence">{{ item.evidence }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">未发现高危变更语句</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <div class="insight-title"><h3>潜在注入</h3></div>
+                {% for item in report.insights.potentialInjection %}
+                    <div class="insight-item">
+                        <div class="insight-id">{{ item.id }}</div>
+                        <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
+                        <div class="insight-evidence">{{ item.evidence }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">未发现明显注入风险</div>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <div class="insight-title"><h3>全表扫描 / 无索引</h3></div>
+                {% for item in report.insights.fullScanOrNoIndex %}
+                    <div class="insight-item">
+                        <div class="insight-id">{{ item.id }}</div>
+                        <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
+                        <div class="insight-evidence">{{ item.evidence }}</div>
+                    </div>
+                {% else %}
+                    <div class="muted">未发现执行计划索引风险</div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section id="details" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Finding Detail</p>
+                <h2>SQL 明细</h2>
+                <p class="section-subtitle">支持按问题状态、级别、文件、规则和 SQL 内容快速过滤。</p>
+            </div>
+        </div>
+        <div class="filter-panel">
+            <div class="filter-summary">
+                <div>当前显示 <strong id="visibleCount">0</strong> / <span id="totalCount">{{ report.findings|length }}</span> 条 SQL</div>
+                <button id="clearFilters" class="report-action" type="button">清空筛选</button>
+            </div>
+            <div id="interactionStatus" class="interaction-status">交互初始化中。如果这里不变，请刷新本地报告。</div>
+            <div class="rule-filters">
+                <span class="rule-filters-label">规则快捷筛选</span>
+                {% for item in report.hotspots.byRule %}
+                    <button class="filter-chip" type="button" data-rule-filter="{{ item.label }}">{{ item.label }} · {{ item.count }}</button>
+                {% else %}
+                    <span class="muted">暂无可筛选规则</span>
+                {% endfor %}
+            </div>
+            <div class="toolbar">
+                <input id="q" type="search" placeholder="按文件、规则、SQL 内容筛选">
+                <select id="issueState">
+                    <option value="problem" {% if report.summary.counts.totalIssues > 0 %}selected{% endif %}>仅问题 SQL</option>
+                    <option value="all" {% if report.summary.counts.totalIssues == 0 %}selected{% endif %}>全部 SQL</option>
+                    <option value="clean">无问题 SQL</option>
+                </select>
+                <select id="severity">
+                    <option value="">全部级别</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                </select>
+            </div>
+        </div>
+
+        {% for finding in report.findings %}
+            {% set hasIssue = finding.issues is not empty %}
+            <article id="finding-{{ finding.id }}" class="finding" data-severity="{{ finding.severity }}" data-has-issue="{{ hasIssue ? 'true' : 'false' }}" data-rules="{% for issue in finding.issues %}{{ issue.type }} {% endfor %}">
+                <div class="finding-head">
+                    <div>
+                        <span class="badge sev-{{ finding.severity }}">{{ finding.severity }}</span>
+                        <span class="badge">{{ finding.sqlType }}</span>
+                        <span class="badge">{{ finding.category }}</span>
+                        <h3>{{ finding.id }}</h3>
+                        <div class="locations">
+                            {% for loc in finding.locations %}
+                                {{ loc.filePath }}:{{ loc.startLine }} · {{ loc.sourceType }}{% if not loop.last %}<br>{% endif %}
+                            {% else %}
+                                未记录位置
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="mini-score"><span>Score</span><strong>{{ finding.score }}</strong></div>
+                </div>
+                {% for issue in finding.issues %}
+                    <div class="issue">
+                        <div class="issue-title">
+                            <span class="badge">{{ issue.source }}</span>
+                            <span class="badge sev-{{ issue.severity }}">{{ issue.type }}</span>
+                        </div>
+                        <div class="issue-message">{{ issue.message }}</div>
+                        {% if issue.suggestion is not null and issue.suggestion is not empty %}
+                            <div class="field"><span>建议</span><div>{{ issue.suggestion }}</div></div>
+                        {% endif %}
+                        {% if issue.evidence is not null and issue.evidence is not empty %}
+                            <div class="field"><span>证据</span><div>{{ issue.evidence }}</div></div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="issue muted">未触发静态或 EXPLAIN 问题</div>
+                {% endfor %}
+                {% if hasIssue %}
+                    <details class="sql-detail">
+                        <summary>查看 SQL</summary>
+                        <div class="sql-tools">
+                            <button class="copy-sql" type="button" data-copy-sql>复制 SQL</button>
+                        </div>
+                        <div class="sql-block-label">原始 SQL</div>
+                        <pre>{{ finding.sql.original }}</pre>
+                        {% if finding.sql.abstracted is not null and finding.sql.abstracted is not empty and finding.sql.abstracted != finding.sql.original %}
+                            <div class="sql-block-label">抽象 SQL</div>
+                            <pre>{{ finding.sql.abstracted }}</pre>
+                        {% endif %}
+                    </details>
+                {% else %}
+                    <div class="issue muted">无问题 SQL。完整 SQL 已保留在 JSON 报告，HTML 默认省略正文以保持报告简洁。</div>
+                {% endif %}
+            </article>
+        {% else %}
+            <div class="empty">未发现 SQL。请确认扫描路径和文件类型。</div>
+        {% endfor %}
+        <div id="emptyFiltered" class="empty" style="display:none;">当前筛选无结果</div>
+    </section>
+        </div>
+    </div>
+</main>
+<script>
+    (function () {
+        function toArray(nodeList) {
+            return Array.prototype.slice.call(nodeList || []);
+        }
+
+        function onReady(callback) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', callback);
+            } else {
+                callback();
+            }
+        }
+
+        onReady(function () {
+            var q = document.getElementById('q');
+            var issueState = document.getElementById('issueState');
+            var severity = document.getElementById('severity');
+            var emptyFiltered = document.getElementById('emptyFiltered');
+            var visibleCount = document.getElementById('visibleCount');
+            var clearFilters = document.getElementById('clearFilters');
+            var interactionStatus = document.getElementById('interactionStatus');
+            var rows = toArray(document.querySelectorAll('.finding'));
+            var ruleFilters = toArray(document.querySelectorAll('[data-rule-filter]'));
+            var copyButtons = toArray(document.querySelectorAll('[data-copy-sql]'));
+            var priorityItems = toArray(document.querySelectorAll('.priority-item'));
+            var priorityToggle = document.getElementById('priorityToggle');
+            var priorityLimit = 12;
+            var priorityExpanded = false;
+            var activeRule = '';
+
+            function setInteractionReady() {
+                if (document.body && document.body.classList) {
+                    document.body.classList.add('interactive-ready');
+                }
+                if (!interactionStatus) {
+                    return;
+                }
+                interactionStatus.className = 'interaction-status ready';
+                interactionStatus.textContent = '交互已启用：可筛选、跳转、展开和复制 SQL。';
+            }
+
+            function rowDataset(row, name) {
+                if (row.dataset && row.dataset[name] !== undefined) {
+                    return row.dataset[name];
+                }
+                return row.getAttribute('data-' + name.replace(/[A-Z]/g, function (letter) {
+                    return '-' + letter.toLowerCase();
+                })) || '';
+            }
+
+            rows.forEach(function (row) {
+                row._searchText = (row.textContent || '').toLowerCase();
+            });
+
+            function applyPriorityDisplay() {
+                if (!priorityToggle) {
+                    return;
+                }
+                if (priorityItems.length <= priorityLimit) {
+                    priorityToggle.style.display = 'none';
+                    return;
+                }
+                priorityItems.forEach(function (item, index) {
+                    item.style.display = priorityExpanded || index < priorityLimit ? '' : 'none';
+                });
+                priorityToggle.textContent = priorityExpanded ? '收起修复队列' : '展开全部 ' + priorityItems.length + ' 条问题';
+            }
+
+            function updateRuleChipState() {
+                ruleFilters.forEach(function (button) {
+                    var rule = button.getAttribute('data-rule-filter') || '';
+                    if (rule && rule === activeRule) {
+                        button.className = 'filter-chip active';
+                    } else {
+                        button.className = 'filter-chip';
+                    }
+                });
+            }
+
+            function applyFilters() {
+                if (!q || !issueState || !severity) {
+                    return;
+                }
+                var term = (q.value || '').toLowerCase();
+                var state = issueState.value;
+                var level = severity.value;
+                var visible = 0;
+                rows.forEach(function (row) {
+                    var matchedText = !term || (row._searchText || '').indexOf(term) >= 0;
+                    var hasIssue = rowDataset(row, 'hasIssue') === 'true';
+                    var matchedIssueState = state === 'all' || (state === 'problem' && hasIssue) || (state === 'clean' && !hasIssue);
+                    var matchedSeverity = !level || rowDataset(row, 'severity') === level;
+                    var rules = row.getAttribute('data-rules') || '';
+                    var matchedRule = !activeRule || rules.indexOf(activeRule) >= 0;
+                    var matched = matchedText && matchedIssueState && matchedSeverity && matchedRule;
+                    row.style.display = matched ? '' : 'none';
+                    if (matched) {
+                        visible++;
+                    }
+                });
+                if (emptyFiltered) {
+                    emptyFiltered.style.display = rows.length > 0 && visible === 0 ? '' : 'none';
+                }
+                if (visibleCount) {
+                    visibleCount.textContent = String(visible);
+                }
+                updateRuleChipState();
+            }
+
+            if (q) {
+                q.addEventListener('input', function () {
+                    applyFilters();
+                });
+            }
+            if (issueState) {
+                issueState.addEventListener('change', applyFilters);
+            }
+            if (severity) {
+                severity.addEventListener('change', applyFilters);
+            }
+            if (clearFilters) {
+                clearFilters.addEventListener('click', function () {
+                    if (q) {
+                        q.value = '';
+                    }
+                    if (issueState) {
+                        issueState.value = rows.some(function (row) {
+                            return rowDataset(row, 'hasIssue') === 'true';
+                        }) ? 'problem' : 'all';
+                    }
+                    if (severity) {
+                        severity.value = '';
+                    }
+                    activeRule = '';
+                    applyFilters();
+                });
+            }
+            ruleFilters.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var rule = button.getAttribute('data-rule-filter') || '';
+                    activeRule = activeRule === rule ? '' : rule;
+                    if (q) {
+                        q.value = '';
+                    }
+                    if (issueState) {
+                        issueState.value = 'problem';
+                    }
+                    if (severity) {
+                        severity.value = '';
+                    }
+                    applyFilters();
+                    var details = document.getElementById('details');
+                    if (details && details.scrollIntoView) {
+                        details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+            copyButtons.forEach(function (button) {
+                button.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    var finding = button.closest ? button.closest('.finding') : null;
+                    var pre = finding ? finding.querySelector('pre') : null;
+                    var sql = pre ? pre.textContent : '';
+                    if (!sql) {
+                        return;
+                    }
+                    var original = button.textContent;
+                    function markCopied() {
+                        button.textContent = '已复制';
+                        setTimeout(function () {
+                            button.textContent = original;
+                        }, 1200);
+                    }
+                    function selectSql() {
+                        if (!pre) {
+                            return;
+                        }
+                        var range = document.createRange();
+                        range.selectNodeContents(pre);
+                        var selection = window.getSelection ? window.getSelection() : null;
+                        if (selection) {
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
+                    }
+                    if (window.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(sql).then(markCopied).catch(selectSql);
+                    } else {
+                        selectSql();
+                    }
+                });
+            });
+            if (priorityToggle) {
+                priorityToggle.addEventListener('click', function () {
+                    priorityExpanded = !priorityExpanded;
+                    applyPriorityDisplay();
+                });
+            }
+            applyPriorityDisplay();
+            applyFilters();
+            setInteractionReady();
+        });
+    }());
+</script>
+</body>
+</html>

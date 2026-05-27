@@ -315,6 +315,23 @@ class JavaSqlExtractorTest {
             assertThat(sqls).hasSize(1);
             assertThat(sqls.get(0)).contains("LIKE '%test%'");
         }
+
+        @Test
+        @DisplayName("不应该把日志文案识别成 SQL")
+        void should_not_extract_log_messages_as_sql() throws SqlExtractionException {
+            String javaCode = """
+                    public class SkuService {
+                        public void sync() {
+                            logger.info("update sku sale state result->{}", result);
+                            logger.info("create file:" + filename);
+                        }
+                    }
+                    """;
+
+            List<String> sqls = extractor.extract(javaCode);
+
+            assertThat(sqls).isEmpty();
+        }
     }
 
     @Nested

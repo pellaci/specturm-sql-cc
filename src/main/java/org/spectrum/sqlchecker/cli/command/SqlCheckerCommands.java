@@ -12,7 +12,7 @@ import picocli.CommandLine;
         name = "sqlchecker",
         description = "SQL quality checker - Scan, analyze, and report on SQL statements in your codebase",
         mixinStandardHelpOptions = true,
-        version = "sqlchecker 1.0.0",
+        version = "sqlchecker 1.2.0",
         subcommands = {
                 ScanCommand.class,
                 InitCommand.class,

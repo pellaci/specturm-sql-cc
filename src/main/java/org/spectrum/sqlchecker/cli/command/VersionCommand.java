@@ -19,8 +19,8 @@ import java.util.concurrent.Callable;
 )
 public class VersionCommand implements Callable<Integer> {
 
-    private static final String VERSION = "1.0.0";
-    private static final String BUILD_TIME = "2024-01-01";
+    private static final String VERSION = "1.2.0";
+    private static final String BUILD_TIME = "2026-05-27";
 
     @Override
     public Integer call() throws Exception {

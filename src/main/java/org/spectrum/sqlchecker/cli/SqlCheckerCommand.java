@@ -15,7 +15,7 @@ import picocli.CommandLine.Option;
         name = "sqlchecker",
         description = "SQL quality checker - Scan, analyze, and report on SQL statements",
         mixinStandardHelpOptions = true,
-        version = "sqlchecker 2.0.0"
+        version = "sqlchecker 1.2.0"
 )
 public class SqlCheckerCommand implements Runnable {
 
@@ -24,7 +24,7 @@ public class SqlCheckerCommand implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("SQL Checker - SQL Quality Detection Tool (v2.0.0)");
+        System.out.println("SQL Checker - SQL Quality Detection Tool (v1.2.0)");
         System.out.println("Use 'sqlchecker --help' to see available commands");
     }
 }

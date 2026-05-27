@@ -2,6 +2,7 @@ package org.spectrum.sqlchecker.cli.command;
 
 import lombok.extern.slf4j.Slf4j;
 import org.spectrum.sqlchecker.application.report.ReportService;
+import org.spectrum.sqlchecker.application.report.dto.DiagnosticReport;
 import org.spectrum.sqlchecker.application.scan.dto.ScanExecutionRequest;
 import org.spectrum.sqlchecker.application.scan.dto.ScanExecutionResult;
 import org.spectrum.sqlchecker.application.scan.dto.ScanProgressSnapshot;
@@ -10,6 +11,8 @@ import org.spectrum.sqlchecker.application.scan.dto.ScanStatistics;
 import org.spectrum.sqlchecker.application.scan.orchestrator.ScanOrchestrator;
 import org.spectrum.sqlchecker.application.scan.orchestrator.ScanProgressListener;
 import org.spectrum.sqlchecker.domain.shared.exception.ScanException;
+import org.spectrum.sqlchecker.infrastructure.report.DiagnosticReportFactory;
+import org.spectrum.sqlchecker.infrastructure.report.DiagnosticReportJsonSerializer;
 import org.spectrum.sqlchecker.infrastructure.report.FallbackReportRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -88,7 +91,7 @@ public class ScanCommand implements Callable<Integer> {
         ScanExecutionResult result = scanOrchestrator.execute(request, listener);
 
         String output = writeReport(result);
-        showResult(result.getStatistics(), output);
+        showResult(result, output, deriveJsonOutputPath(output));
 
         return 0;
     }
@@ -131,6 +134,7 @@ public class ScanCommand implements Callable<Integer> {
         try {
             if (reportService != null) {
                 reportService.generateHtmlReport(result.getScanResult(), absolutePath);
+                reportService.generateJsonReport(result.getScanResult(), deriveJsonOutputPath(absolutePath));
                 return absolutePath;
             }
             return writeFallbackReport(result, absolutePath);
@@ -147,26 +151,62 @@ public class ScanCommand implements Callable<Integer> {
         String html = fallbackReportRenderer.render(result);
         try {
             Files.writeString(Path.of(outputPath), html);
+            Files.writeString(
+                    Path.of(deriveJsonOutputPath(outputPath)),
+                    DiagnosticReportJsonSerializer.toJson(DiagnosticReportFactory.from(result.getScanResult()))
+            );
             return outputPath;
         } catch (IOException e) {
             throw new ScanException("Failed to write fallback report", e);
         }
     }
 
-    private void showResult(ScanStatistics stats, String reportPath) {
+    private String deriveJsonOutputPath(String htmlOutputPath) {
+        if (htmlOutputPath == null || htmlOutputPath.isBlank()) {
+            return "report.json";
+        }
+        String lower = htmlOutputPath.toLowerCase();
+        if (lower.endsWith(".html")) {
+            return htmlOutputPath.substring(0, htmlOutputPath.length() - 5) + ".json";
+        }
+        if (lower.endsWith(".htm")) {
+            return htmlOutputPath.substring(0, htmlOutputPath.length() - 4) + ".json";
+        }
+        return htmlOutputPath + ".json";
+    }
+
+    private void showResult(ScanExecutionResult result, String reportPath, String jsonReportPath) {
+        ScanStatistics stats = result.getStatistics();
+        DiagnosticReport report = DiagnosticReportFactory.from(result.getScanResult());
+        DiagnosticReport.Counts counts = report.getSummary().getCounts();
+        DiagnosticReport.Coverage coverage = report.getSummary().getCoverage();
+        int parseFailures = report.getDiagnostics().getParseFailures() == null
+                ? 0
+                : report.getDiagnostics().getParseFailures().size();
+        int manualReview = report.getDiagnostics().getManualReview() == null
+                ? 0
+                : report.getDiagnostics().getManualReview().size();
+        int skippedExplain = report.getDiagnostics().getSkippedExplain() == null
+                ? 0
+                : report.getDiagnostics().getSkippedExplain().size();
         if (progressDisplay != null) {
             progressDisplay.showSimpleResult(
                     stats.getTotalFiles(),
                     stats.getJavaFiles(),
                     stats.getXmlFiles(),
                     stats.getSqlFiles(),
-                    stats.getSqlFound(),
-                    stats.getSqlParsed(),
-                    stats.getCriticalIssues(),
-                    stats.getWarningIssues(),
-                    stats.getInfoIssues(),
+                    counts.getTotalSql(),
+                    counts.getUniqueSql(),
+                    coverage.getParseRate(),
+                    parseFailures,
+                    manualReview,
+                    skippedExplain,
+                    counts.getCriticalIssues(),
+                    counts.getWarningIssues(),
+                    counts.getInfoIssues(),
                     stats.getDurationMs(),
-                    reportPath
+                    reportPath,
+                    jsonReportPath
             );
             return;
         }
@@ -175,16 +215,21 @@ public class ScanCommand implements Callable<Integer> {
         System.out.println("Scan Results");
         System.out.println("═══════════════════════════════════════════════════════════════");
         System.out.println("  Files scanned: " + stats.getTotalFiles() + " (" + stats.getJavaFiles() + " Java, " + stats.getXmlFiles() + " XML, " + stats.getSqlFiles() + " SQL)");
-        System.out.println("  SQL found:     " + stats.getSqlFound());
-        System.out.println("  SQL parsed:    " + stats.getSqlParsed());
-        System.out.println("  Duration:      " + stats.getDurationMs() + "ms");
+        System.out.println("  SQL occurrences: " + counts.getTotalSql());
+        System.out.println("  Unique SQL:       " + counts.getUniqueSql());
+        System.out.printf("  Parse coverage:   %.1f%%%n", coverage.getParseRate());
+        System.out.println("  Parse failures:   " + parseFailures);
+        System.out.println("  Manual review:    " + manualReview);
+        System.out.println("  EXPLAIN skipped:  " + skippedExplain);
+        System.out.println("  Duration:         " + stats.getDurationMs() + "ms");
         System.out.println();
         System.out.println("Issue Summary:");
-        System.out.println("  Critical: " + stats.getCriticalIssues());
-        System.out.println("  Warning:  " + stats.getWarningIssues());
-        System.out.println("  Info:     " + stats.getInfoIssues());
+        System.out.println("  Critical: " + counts.getCriticalIssues());
+        System.out.println("  Warning:  " + counts.getWarningIssues());
+        System.out.println("  Info:     " + counts.getInfoIssues());
         System.out.println();
         System.out.println("HTML report: " + reportPath);
+        System.out.println("JSON report: " + jsonReportPath);
         System.out.println();
     }
 }

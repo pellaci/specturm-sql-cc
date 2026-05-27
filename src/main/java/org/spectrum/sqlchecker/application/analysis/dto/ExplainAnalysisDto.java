@@ -46,6 +46,11 @@ public class ExplainAnalysisDto {
     private long durationMs;
 
     /**
+     * EXPLAIN 未能完成时的诊断信息。该字段用于报告诊断，不计入 SQL 风险问题。
+     */
+    private String errorMessage;
+
+    /**
      * 是否有问题
      */
     public boolean hasIssues() {

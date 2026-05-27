@@ -60,10 +60,10 @@ class SelectStarRuleTest {
         }
 
         @Test
-        @DisplayName("应该支持 AllColumns 节点类型")
-        void should_support_all_columns() {
+        @DisplayName("不应该直接支持 AllColumns 节点类型，避免同一 SELECT * 重复上报")
+        void should_not_support_all_columns_directly() {
             assertThat(rule.supportedNodeTypes())
-                    .contains(net.sf.jsqlparser.statement.select.AllColumns.class);
+                    .doesNotContain(net.sf.jsqlparser.statement.select.AllColumns.class);
         }
     }
 
@@ -156,9 +156,22 @@ class SelectStarRuleTest {
 
             rule.visit(select, context);
 
-            // table.* 不等同于 AllColumns，可能需要检查 AllTableColumns
-            // 根据规则实现，只检查 AllColumns
-            // 这个测试验证规则的边界条件
+            assertThat(context.hasIssues()).isTrue();
+            assertThat(context.getIssueCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("重复访问 PlainSelect 和 AllColumns 时不应该重复上报")
+        void should_not_duplicate_when_visitor_reaches_all_columns() throws Exception {
+            String sql = "SELECT * FROM users";
+            RuleContext context = createContext("test-7", sql);
+            Statement statement = CCJSqlParserUtil.parse(sql);
+            PlainSelect select = (PlainSelect) ((Select) statement).getSelectBody();
+
+            rule.visit(select, context);
+            select.getSelectItems().forEach(item -> rule.visit(item.getExpression(), context));
+
+            assertThat(context.getIssueCount()).isEqualTo(1);
         }
     }
 
