@@ -279,6 +279,24 @@ class ReportServiceImplTest {
     }
 
     @Test
+    @DisplayName("html report should render consulting summary campaigns confidence and methodology")
+    void should_render_consulting_summary_campaigns_confidence_and_methodology(@org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
+        org.spectrum.sqlchecker.infrastructure.report.impl.ReportServiceImpl service =
+                new org.spectrum.sqlchecker.infrastructure.report.impl.ReportServiceImpl(new TemplateEngine());
+        Path output = tempDir.resolve("report.html");
+
+        service.generateHtmlReport(createInsightScanResult(), output.toString());
+
+        String html = Files.readString(output);
+        assertThat(html).contains("Executive Conclusion");
+        assertThat(html).contains("Remediation Campaigns");
+        assertThat(html).contains("Evidence Confidence");
+        assertThat(html).contains("Methodology");
+        assertThat(html).contains("acceptance-checklist");
+        assertThat(html).contains("href=\"#finding-");
+    }
+
+    @Test
     @DisplayName("html report should render navigation and operational filters")
     void should_render_navigation_and_operational_filters(@org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
         org.spectrum.sqlchecker.infrastructure.report.impl.ReportServiceImpl service =

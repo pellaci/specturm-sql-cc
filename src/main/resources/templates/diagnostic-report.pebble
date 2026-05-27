@@ -184,6 +184,7 @@
         }
         .next-steps li { margin: 7px 0; color: var(--muted-strong); }
         .next-steps-title { margin-top: 16px; }
+        .driver-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
         .gate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         .gate {
             padding: 12px;
@@ -243,6 +244,9 @@
         }
         .stat-count { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
         .priority-list { display: grid; gap: 12px; }
+        .campaign-list { display: grid; gap: 16px; }
+        .campaign-card { border: 1px solid var(--line); border-radius: 8px; padding: 18px; background: #fff; }
+        .acceptance-checklist ul { margin: 6px 0 0 18px; }
         .report-action {
             border: 1px solid var(--line);
             background: var(--panel);
@@ -483,7 +487,7 @@
             body { background: #ffffff; }
             .shell { max-width: none; padding: 0; }
             .toolbar, .toc, .filter-panel, script { display: none; }
-            .panel, .metric, .finding, .priority-item, .executive-panel, .risk-card { break-inside: avoid; }
+            .panel, .metric, .finding, .priority-item, .campaign-card, .executive-panel, .risk-card { break-inside: avoid; }
         }
     </style>
 </head>
@@ -508,10 +512,12 @@
             <p class="toc-title">Report Map</p>
             <a href="#overview">总览</a>
             <a href="#brief">审计结论</a>
+            <a href="#campaigns">修复战役</a>
             <a href="#queue">修复队列</a>
             <a href="#hotspots">风险热点</a>
             <a href="#insights">诊断洞察</a>
             <a href="#details">SQL 明细</a>
+            <a href="#methodology">方法口径</a>
         </aside>
         <div class="report-main">
 
@@ -550,7 +556,7 @@
         </div>
         <div class="decision-card">
             <span>下一步</span>
-            <strong>{% if report.summary.counts.criticalIssues > 0 %}先清 Critical{% elseif report.summary.counts.warningIssues > 0 %}收敛 Warning 热点{% else %}保留基线并接入流水线{% endif %}</strong>
+            <strong>{% if report.summary.counts.criticalIssues > 0 %}先处理 Critical{% elseif report.summary.counts.warningIssues > 0 %}收敛 Warning 热点{% else %}保留基线并接入流水线{% endif %}</strong>
         </div>
     </section>
 
@@ -559,44 +565,86 @@
             <div class="executive-panel verdict-{{ report.summary.riskLevel }}">
                 <div class="section-head">
                     <div>
-                        <p class="kicker">Executive Brief</p>
-                        <h2>审计结论</h2>
+                        <p class="kicker">Executive Conclusion</p>
+                        <h2>执行摘要</h2>
                     </div>
                 </div>
-                <div class="verdict-title">
-                    <span class="badge sev-{{ report.summary.riskLevel }}">{{ report.summary.riskLevel }}</span>
-                    <h3>当前 SQL 风险等级为 {{ report.summary.riskLevel }}</h3>
-                </div>
-                <div class="verdict-copy">
-                    {% if report.summary.riskLevel == 'CRITICAL' %}
-                        存在阻断级 SQL 风险。建议先处理 Critical 问题，尤其是危险 DML、潜在注入和会扩大数据扫描面的 SQL，再进入性能与规范治理。
-                    {% elseif report.summary.riskLevel == 'WARNING' %}
-                        存在需要纳入迭代治理的 SQL 风险。建议优先处理高频规则和高热文件，并补齐可解释执行计划覆盖。
-                    {% elseif report.summary.riskLevel == 'INFO' %}
-                        当前未发现高危问题，但仍有可优化项。建议持续关注重复 SQL、模板待确认和缺少 EXPLAIN 证据的语句。
+                <p class="verdict-copy">{{ report.executiveSummary.riskConclusion }}</p>
+                <div class="driver-list">
+                    {% for driver in report.executiveSummary.topDrivers %}
+                        <span class="badge">{{ driver }}</span>
                     {% else %}
-                        当前扫描未发现显著 SQL 风险。建议保留报告 JSON 作为后续基线，并在变更流水线中持续运行。
-                    {% endif %}
+                        <span class="muted">未发现主要风险驱动项</span>
+                    {% endfor %}
                 </div>
-                <h3 class="next-steps-title">建议处置顺序</h3>
+                <h3 class="next-steps-title" title="建议处置顺序">建议动作</h3>
                 <ol class="next-steps">
-                    <li><strong>先处理 Critical</strong>：危险 DML、SQL 注入风险、会导致线上事故的无约束变更语句。</li>
-                    <li><strong>再处理热点</strong>：从 Top 风险文件和 Top 规则开始，优先修复集中爆发的问题。</li>
-                    <li><strong>补齐证据</strong>：对关键查询启用安全 EXPLAIN，确认是否存在全表扫描、索引缺失或扫描行数异常。</li>
+                    {% for action in report.executiveSummary.recommendedActions %}
+                        <li>{{ action }}</li>
+                    {% endfor %}
                 </ol>
             </div>
-            <div class="executive-panel">
-                <p class="kicker">Quality Gate</p>
-                <h2>质量门禁</h2>
-                <p class="section-subtitle">用于判断这份报告是否可以支撑修复决策。</p>
-                <div class="gate-grid" style="margin-top:14px;">
-                    <div class="gate"><span>解析覆盖率</span><strong>{{ report.summary.coverage.parseRate|numberFormat }}%</strong></div>
-                    <div class="gate"><span>EXPLAIN 覆盖率</span><strong>{{ report.summary.coverage.explainCoverage|numberFormat }}%</strong></div>
-                    <div class="gate"><span>需人工确认 SQL</span><strong>{{ report.diagnostics.manualReview|length }}</strong></div>
-                    <div class="gate"><span>EXPLAIN 跳过</span><strong>{{ report.diagnostics.skippedExplain|length }}</strong></div>
-                    <div class="gate"><span>EXPLAIN 异常</span><strong>{{ report.diagnostics.configWarnings|length }}</strong></div>
+            <div>
+                <div class="executive-panel">
+                    <p class="kicker">Evidence Confidence</p>
+                    <h2>证据可信度</h2>
+                    <span class="badge">{{ report.confidence.level }}</span>
+                    <p class="section-subtitle">{{ report.executiveSummary.confidenceSummary }}</p>
+                    <div class="field"><span>证据来源</span>
+                        <div>{% for source in report.confidence.evidenceSources %}{{ source }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+                    </div>
+                    <div class="field"><span>限制</span>
+                        <ul>{% for limit in report.confidence.limitations %}<li>{{ limit }}</li>{% else %}<li>未发现明显证据缺口。</li>{% endfor %}</ul>
+                    </div>
+                </div>
+                <div class="executive-panel" style="margin-top:16px;">
+                    <p class="kicker">Quality Gate</p>
+                    <h2>质量门禁</h2>
+                    <p class="section-subtitle">用于判断这份报告是否可以支撑修复决策。</p>
+                    <div class="gate-grid" style="margin-top:14px;">
+                        <div class="gate"><span>解析覆盖率</span><strong>{{ report.summary.coverage.parseRate|numberFormat }}%</strong></div>
+                        <div class="gate"><span>EXPLAIN 覆盖率</span><strong>{{ report.summary.coverage.explainCoverage|numberFormat }}%</strong></div>
+                        <div class="gate"><span>需人工确认 SQL</span><strong>{{ report.diagnostics.manualReview|length }}</strong></div>
+                        <div class="gate"><span>EXPLAIN 跳过</span><strong>{{ report.diagnostics.skippedExplain|length }}</strong></div>
+                        <div class="gate"><span>EXPLAIN 异常</span><strong>{{ report.diagnostics.configWarnings|length }}</strong></div>
+                    </div>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <section id="campaigns" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Remediation Campaigns</p>
+                <h2>修复战役</h2>
+                <p class="section-subtitle">把散点 SQL 风险组织成可派单、可验收的治理动作。</p>
+            </div>
+        </div>
+        <div class="campaign-list">
+            {% for campaign in report.campaigns %}
+                <article class="campaign-card" id="campaign-{{ campaign.id }}">
+                    <div class="priority-title">
+                        <span class="badge">{{ campaign.priority }}</span>
+                        <span class="badge">{{ campaign.theme }}</span>
+                        <span class="badge">{{ campaign.evidenceLevel }}</span>
+                    </div>
+                    <h3>{{ campaign.title }}</h3>
+                    <p>{{ campaign.summary }}</p>
+                    <div class="field"><span>范围</span><div>{{ campaign.scope.sqlCount }} 条 SQL · {{ campaign.scope.fileCount }} 个文件</div></div>
+                    <div class="field"><span>建议</span><ul>{% for item in campaign.recommendations %}<li>{{ item }}</li>{% endfor %}</ul></div>
+                    <div class="field acceptance-checklist"><span>验收</span><ul>{% for item in campaign.acceptanceChecklist %}<li>{{ item }}</li>{% endfor %}</ul></div>
+                    <div class="field"><span>证据</span>
+                        <div>
+                            {% for findingId in campaign.findingIds %}
+                                <a class="action-link" href="#finding-{{ findingId }}">{{ findingId }}</a>{% if not loop.last %} · {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </article>
+            {% else %}
+                <div class="empty">未形成修复战役。建议保留本次报告作为基线。</div>
+            {% endfor %}
         </div>
     </section>
 
@@ -892,6 +940,21 @@
             <div class="empty">未发现 SQL。请确认扫描路径和文件类型。</div>
         {% endfor %}
         <div id="emptyFiltered" class="empty" style="display:none;">当前筛选无结果</div>
+    </section>
+
+    <section id="methodology" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Methodology</p>
+                <h2>方法与口径</h2>
+            </div>
+        </div>
+        <div class="grid columns">
+            <div class="panel"><h3>评分</h3><ul>{% for item in report.methodology.scoring %}<li>{{ item }}</li>{% endfor %}</ul></div>
+            <div class="panel"><h3>严重级别</h3><ul>{% for item in report.methodology.severityDefinitions %}<li>{{ item }}</li>{% endfor %}</ul></div>
+            <div class="panel"><h3>覆盖率</h3><ul>{% for item in report.methodology.coverageDefinitions %}<li>{{ item }}</li>{% endfor %}</ul></div>
+            <div class="panel"><h3>已知限制</h3><ul>{% for item in report.methodology.knownLimits %}<li>{{ item }}</li>{% endfor %}</ul></div>
+        </div>
     </section>
         </div>
     </div>
