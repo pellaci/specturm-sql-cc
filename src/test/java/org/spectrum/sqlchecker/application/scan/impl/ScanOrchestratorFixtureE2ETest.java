@@ -3,6 +3,7 @@ package org.spectrum.sqlchecker.application.scan.impl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.spectrum.sqlchecker.application.report.ReportService;
 import org.spectrum.sqlchecker.application.scan.dto.ScanExecutionRequest;
 import org.spectrum.sqlchecker.application.scan.dto.ScanExecutionResult;
 import org.spectrum.sqlchecker.application.scan.orchestrator.ScanOrchestrator;
@@ -31,6 +32,9 @@ class ScanOrchestratorFixtureE2ETest {
     @Autowired
     private ScanOrchestrator scanOrchestrator;
 
+    @Autowired
+    private ReportService reportService;
+
     @TempDir
     Path tempDir;
 
@@ -48,9 +52,9 @@ class ScanOrchestratorFixtureE2ETest {
         );
 
         assertThat(result.getStatistics().getTotalFiles()).isEqualTo(3);
-        assertThat(result.getStatistics().getSqlFound()).isEqualTo(3);
-        assertThat(result.getStatistics().getSqlParsed()).isEqualTo(3);
-        assertThat(result.getSqlEntries()).hasSize(3);
+        assertThat(result.getStatistics().getSqlFound()).isEqualTo(4);
+        assertThat(result.getStatistics().getSqlParsed()).isEqualTo(4);
+        assertThat(result.getSqlEntries()).hasSize(4);
 
         Set<SqlSourceType> sourceTypes = result.getSqlEntries().stream()
                 .flatMap(entry -> entry.getLocations().stream())
@@ -61,6 +65,16 @@ class ScanOrchestratorFixtureE2ETest {
                 .contains(SqlSourceType.STRING_LITERAL, SqlSourceType.MYBATIS, SqlSourceType.JAVASCRIPT);
 
         assertThat(result.getIssueSummary()).containsEntry("SELECT_STAR", 1);
+
+        Path reportPath = tempDir.resolve("mixed-repo-report.json");
+        reportService.generateJsonReport(result.getScanResult(), reportPath.toString());
+
+        String json = Files.readString(reportPath);
+        assertThat(json).contains("\"executiveSummary\"");
+        assertThat(json).contains("\"campaigns\"");
+        assertThat(json).contains("\"confidence\"");
+        assertThat(json).contains("\"methodology\"");
+        assertThat(json).contains("p0-dynamic-sql-safety");
     }
 
     @Test

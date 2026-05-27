@@ -6,4 +6,7 @@
         FROM users
         WHERE status = #{status}
     </select>
+    <select id="findUsersOrdered" resultType="map">
+        SELECT id, name FROM users ORDER BY ${orderBy}
+    </select>
 </mapper>
