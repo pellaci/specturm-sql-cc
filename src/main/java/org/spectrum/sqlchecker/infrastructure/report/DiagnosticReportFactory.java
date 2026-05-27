@@ -109,7 +109,7 @@ public final class DiagnosticReportFactory {
                 .findings(findings)
                 .diagnostics(diagnostics)
                 .executiveSummary(buildExecutiveSummary(result, summary, confidence, diagnostics, sqlStatements))
-                .campaigns(buildCampaigns(findings, sqlStatements))
+                .campaigns(buildCampaigns(findings))
                 .confidence(confidence)
                 .methodology(defaultMethodology())
                 .build();
@@ -132,9 +132,7 @@ public final class DiagnosticReportFactory {
                 .build();
     }
 
-    private static List<DiagnosticReport.RemediationCampaign> buildCampaigns(
-            List<DiagnosticReport.Finding> findings,
-            List<SqlStatementDto> sqlStatements) {
+    private static List<DiagnosticReport.RemediationCampaign> buildCampaigns(List<DiagnosticReport.Finding> findings) {
         List<DiagnosticReport.RemediationCampaign> campaigns = new ArrayList<>();
         addCampaign(campaigns, campaignForRule(
                 "p0-dynamic-sql-safety",
