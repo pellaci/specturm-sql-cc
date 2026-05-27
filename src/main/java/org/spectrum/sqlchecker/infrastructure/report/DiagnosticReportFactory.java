@@ -50,6 +50,8 @@ public final class DiagnosticReportFactory {
         int parsedSql = countParsedSql(sqlStatements);
         int parseScope = sqlStatements.size();
         int totalFiles = result.getTotalFiles() > 0 ? result.getTotalFiles() : result.getFilesScanned();
+        int issueSql = countIssueSql(sqlStatements);
+        int cleanSql = Math.max(0, uniqueSql - issueSql);
         double parseRate = parseScope == 0 ? 0.0 : round(Math.min(parsedSql, parseScope) * 100.0 / parseScope);
         int explainEligible = 0;
         int explainExecuted = 0;
@@ -67,6 +69,8 @@ public final class DiagnosticReportFactory {
                 .totalFiles(totalFiles)
                 .totalSql(totalSql)
                 .uniqueSql(uniqueSql)
+                .issueSql(issueSql)
+                .cleanSql(cleanSql)
                 .totalIssues(totalIssues)
                 .criticalIssues(critical)
                 .warningIssues(warning)
@@ -156,21 +160,17 @@ public final class DiagnosticReportFactory {
                 List.of("SELECT_WITHOUT_WHERE", "ORDER_BY_WITHOUT_LIMIT", "MISSING_INDEX", "NO_INDEX_USED", "FULL_TABLE_SCAN"),
                 List.of("补充可命中索引的过滤条件、分页边界，并用 EXPLAIN 验证访问路径。"),
                 List.of("重新扫描确认 P1 高风险项下降。", "对关键查询执行 EXPLAIN 并记录访问类型、行数和索引命中。")));
-        List<DiagnosticReport.Finding> reviewFindings = findings.stream()
-                .filter(finding -> finding.getExplain() != null && !"SUPPORTED".equals(finding.getExplain().getEligibility()))
-                .toList();
-        if (!reviewFindings.isEmpty()) {
-            campaigns.add(campaign(
-                    "p2-evidence-completion",
-                    "P2",
-                    "MAINTAINABILITY",
-                    "证据补齐与模板复核",
-                    "补齐 EXPLAIN 证据和人工复核动态模板，降低报告中的不可证明项。",
-                    "NEEDS_REVIEW",
-                    reviewFindings,
-                    List.of("为关键查询配置安全 EXPLAIN；对动态模板记录白名单和业务边界。"),
-                    List.of("重新扫描并确认 manual review 和 skipped EXPLAIN 数下降。")));
-        }
+        addCampaign(campaigns, campaignForRule(
+                "p2-template-review",
+                "P2",
+                "MAINTAINABILITY",
+                "模板解析与未知规则复核",
+                "集中复核 UNKNOWN、SQL_SYNTAX_ERROR 等无法直接派修的模板问题，先把噪音转成明确规则或修复项。",
+                "NEEDS_REVIEW",
+                findings,
+                List.of("UNKNOWN", "SQL_SYNTAX_ERROR"),
+                List.of("定位 MyBatis 动态分支、数据库方言或占位符归一化问题，补齐最小样例后重新扫描。"),
+                List.of("重新扫描并确认 UNKNOWN/SQL_SYNTAX_ERROR 已下降，或被归类到明确规则。")));
         return campaigns;
     }
 
@@ -270,9 +270,9 @@ public final class DiagnosticReportFactory {
                 .riskConclusion(conclusion)
                 .topDrivers(topRules)
                 .recommendedActions(actions)
-                .confidenceSummary("Evidence confidence: " + confidence.getLevel()
-                        + " · Manual review " + diagnostics.getManualReview().size()
-                        + " · EXPLAIN skipped " + diagnostics.getSkippedExplain().size())
+                .confidenceSummary("证据可信度: " + confidence.getLevel()
+                        + " · 人工复核 " + diagnostics.getManualReview().size()
+                        + " · EXPLAIN 未执行 " + diagnostics.getSkippedExplain().size())
                 .build();
     }
 
@@ -287,17 +287,18 @@ public final class DiagnosticReportFactory {
 
         List<String> limits = new ArrayList<>();
         if (!diagnostics.getSkippedExplain().isEmpty()) {
-            limits.add("EXPLAIN evidence is incomplete because some SQL was skipped.");
+            limits.add("未配置或未执行 EXPLAIN，性能判断以静态规则为主。");
         }
         if (!diagnostics.getManualReview().isEmpty()) {
-            limits.add("Manual review is required for dynamic templates or evidence gaps.");
+            limits.add("动态模板、解析异常或 EXPLAIN 异常需要人工复核。");
         }
         if (!diagnostics.getParseFailures().isEmpty()) {
-            limits.add("Some SQL could not be parsed and should be fixed before relying on aggregate conclusions.");
+            limits.add("部分 SQL 需要修正模板或占位符后再进入精确诊断。");
         }
 
         String level = diagnostics.getParseFailures().isEmpty()
                 && diagnostics.getManualReview().isEmpty()
+                && diagnostics.getSkippedExplain().isEmpty()
                 && diagnostics.getConfigWarnings().isEmpty()
                 ? "STRONG"
                 : "NEEDS_REVIEW";
@@ -491,7 +492,9 @@ public final class DiagnosticReportFactory {
     private static List<DiagnosticReport.InsightItem> skippedExplainInsights(List<SqlStatementDto> sqlStatements) {
         List<DiagnosticReport.InsightItem> items = new ArrayList<>();
         for (SqlStatementDto sql : sqlStatements) {
-            if (sql.getExplainEligibility() != null && sql.getExplainEligibility() != ExplainEligibility.SUPPORTED) {
+            if (issueCount(sql) > 0
+                    && sql.getExplainEligibility() != null
+                    && sql.getExplainEligibility() != ExplainEligibility.SUPPORTED) {
                 items.add(insight(sql, "EXPLAIN 未执行", 1, formatSeverity(sql.getSeverity()),
                         explainSkipReason(sql)));
             }
@@ -640,6 +643,16 @@ public final class DiagnosticReportFactory {
         }
         if (sql.getExplainAnalysis() != null && sql.getExplainAnalysis().getIssues() != null) {
             count += sql.getExplainAnalysis().getIssues().size();
+        }
+        return count;
+    }
+
+    private static int countIssueSql(List<SqlStatementDto> sqlStatements) {
+        int count = 0;
+        for (SqlStatementDto sql : sqlStatements) {
+            if (issueCount(sql) > 0) {
+                count++;
+            }
         }
         return count;
     }
@@ -866,8 +879,11 @@ public final class DiagnosticReportFactory {
         if (hasExplainFailure(sql)) {
             return "EXPLAIN 失败 - " + sql.getExplainAnalysis().getErrorMessage();
         }
-        if (sql.getExplainEligibility() != null && sql.getExplainEligibility() != ExplainEligibility.SUPPORTED) {
-            return "缺少 EXPLAIN 证据 - " + explainSkipReason(sql);
+        if (containsIssue(sql, IssueType.SQL_INJECTION_RISK.name())
+                || containsIssue(sql, IssueType.DYNAMIC_SQL.name())
+                || safe(sql.getOriginalSql(), "").contains("${")
+                || safe(sql.getNormalizedSql(), "").contains("${")) {
+            return "动态模板需确认白名单或参数绑定边界";
         }
         return null;
     }

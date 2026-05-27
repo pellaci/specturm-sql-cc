@@ -144,7 +144,7 @@ class ScanCommandTest {
         assertThat(listenerCaptor.getValue()).isNotNull();
         verify(progressDisplay).showReportGeneration(anyString());
         verify(progressDisplay).showSimpleResult(eq(1), eq(1), eq(0), eq(0), eq(1), eq(1), eq(100.0), eq(0),
-                eq(1), eq(1), eq(0), eq(0), eq(0), eq(10L), anyString(), anyString());
+                eq(0), eq(1), eq(0), eq(0), eq(0), eq(10L), anyString(), anyString());
     }
 
     @Test
@@ -166,7 +166,7 @@ class ScanCommandTest {
         assertThat(exitCode).isEqualTo(0);
         verify(progressDisplay).showReportGeneration(anyString());
         verify(progressDisplay).showSimpleResult(eq(1), eq(1), eq(0), eq(0), eq(1), eq(1), eq(100.0), eq(0),
-                eq(1), eq(1), eq(0), eq(0), eq(0), eq(10L), anyString(), anyString());
+                eq(0), eq(1), eq(0), eq(0), eq(0), eq(10L), anyString(), anyString());
     }
 
     @Test

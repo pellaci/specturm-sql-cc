@@ -359,7 +359,6 @@
         .filter-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
         .filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
         .finding { margin-bottom: 14px; padding: 18px; }
-        body:not(.interactive-ready) .finding[data-has-issue="false"] { display: none; }
         .finding-head {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -516,15 +515,15 @@
             <a href="#queue">修复队列</a>
             <a href="#hotspots">风险热点</a>
             <a href="#insights">诊断洞察</a>
-            <a href="#details">SQL 明细</a>
+            <a href="#details">问题明细</a>
             <a href="#methodology">方法口径</a>
         </aside>
         <div class="report-main">
 
     <section id="overview" class="grid metrics">
         <div class="metric"><div class="value">{{ report.summary.counts.totalFiles }}</div><div class="label">扫描文件</div></div>
-        <div class="metric"><div class="value">{{ report.summary.counts.uniqueSql }}</div><div class="label">唯一 SQL / 总发现 {{ report.summary.counts.totalSql }}</div></div>
-        <div class="metric"><div class="value">{{ report.summary.counts.totalIssues }}</div><div class="label">问题总数：C {{ report.summary.counts.criticalIssues }} / W {{ report.summary.counts.warningIssues }} / I {{ report.summary.counts.infoIssues }}</div></div>
+        <div class="metric"><div class="value">{{ report.summary.counts.issueSql }}</div><div class="label">问题 SQL / 唯一 SQL {{ report.summary.counts.uniqueSql }}</div></div>
+        <div class="metric"><div class="value">{{ report.summary.counts.totalIssues }}</div><div class="label">问题项：C {{ report.summary.counts.criticalIssues }} / W {{ report.summary.counts.warningIssues }}</div></div>
         <div class="metric"><div class="value">{{ report.summary.coverage.parseRate|numberFormat }}%</div><div class="label">解析覆盖率</div></div>
         <div class="metric"><div class="value">{{ report.summary.coverage.explainCoverage|numberFormat }}%</div><div class="label">EXPLAIN 覆盖率</div></div>
     </section>
@@ -604,8 +603,8 @@
                     <div class="gate-grid" style="margin-top:14px;">
                         <div class="gate"><span>解析覆盖率</span><strong>{{ report.summary.coverage.parseRate|numberFormat }}%</strong></div>
                         <div class="gate"><span>EXPLAIN 覆盖率</span><strong>{{ report.summary.coverage.explainCoverage|numberFormat }}%</strong></div>
-                        <div class="gate"><span>需人工确认 SQL</span><strong>{{ report.diagnostics.manualReview|length }}</strong></div>
-                        <div class="gate"><span>EXPLAIN 跳过</span><strong>{{ report.diagnostics.skippedExplain|length }}</strong></div>
+                        <div class="gate"><span>人工复核项</span><strong>{{ report.diagnostics.manualReview|length }}</strong></div>
+                        <div class="gate"><span>执行计划证据</span><strong>{% if report.summary.coverage.explainCoverage > 0 %}{{ report.summary.coverage.explainCoverage|numberFormat }}%{% else %}未启用{% endif %}</strong></div>
                         <div class="gate"><span>EXPLAIN 异常</span><strong>{{ report.diagnostics.configWarnings|length }}</strong></div>
                     </div>
                 </div>
@@ -636,9 +635,12 @@
                     <div class="field acceptance-checklist"><span>验收</span><ul>{% for item in campaign.acceptanceChecklist %}<li>{{ item }}</li>{% endfor %}</ul></div>
                     <div class="field"><span>证据</span>
                         <div>
-                            {% for findingId in campaign.findingIds %}
-                                <a class="action-link" href="#finding-{{ findingId }}">{{ findingId }}</a>{% if not loop.last %} · {% endif %}
+                            {% for findingId in campaign.scope.examples %}
+                                <a class="action-link" href="#finding-{{ findingId }}" title="{{ findingId }}">样例 {{ loop.index + 1 }}</a>{% if not loop.last %} · {% endif %}
                             {% endfor %}
+                            {% if campaign.findingIds|length > campaign.scope.examples|length %}
+                                <span class="muted"> · 更多证据见问题明细筛选</span>
+                            {% endif %}
                         </div>
                     </div>
                 </article>
@@ -653,7 +655,7 @@
             <div>
                 <p class="kicker">Remediation Queue</p>
                 <h2>优先修复队列</h2>
-                <p class="section-subtitle">默认展示前 12 条问题，聚焦位置、原因、建议和证据。完整清单见 SQL 明细。</p>
+                <p class="section-subtitle">默认展示前 12 条问题，聚焦位置、原因、建议和证据。完整清单见问题明细。</p>
             </div>
             <button id="priorityToggle" class="report-action" type="button">展开全部问题</button>
         </div>
@@ -666,7 +668,13 @@
                                 <div class="priority-title">
                                     <span class="badge sev-{{ finding.severity }}">{{ finding.severity }}</span>
                                     <span class="badge">{{ finding.sqlType }}</span>
-                                    <span class="priority-id">{{ finding.id }}</span>
+                                    <span class="priority-id" title="{{ finding.id }}">
+                                        {% for loc in finding.locations %}
+                                            {% if loop.first %}{{ loc.fileName }}:{{ loc.startLine }}{% endif %}
+                                        {% else %}
+                                            {{ finding.sqlType }} SQL
+                                        {% endfor %}
+                                    </span>
                                 </div>
                                 <div class="priority-meta">
                                     {% for loc in finding.locations %}
@@ -760,7 +768,7 @@
             <div>
                 <p class="kicker">Insights</p>
                 <h2>诊断洞察</h2>
-                <p class="section-subtitle">把重复、模板待确认、安全跳过和执行计划风险拆成可追踪线索。</p>
+                <p class="section-subtitle">只保留能指导修复排序的线索；数据库未配置等全局证据缺口在质量门禁中说明。</p>
             </div>
         </div>
         <div class="grid insights">
@@ -768,7 +776,7 @@
                 <div class="insight-title"><h3>重复 SQL</h3></div>
                 {% for item in report.insights.duplicateSql %}
                     <div class="insight-item">
-                        <div class="insight-id">{{ item.id }}</div>
+                        <div class="insight-id">{{ item.title }}</div>
                         <span class="badge sev-{{ item.severity }}">{{ item.count }} 处</span>
                         <div class="insight-evidence">{{ item.evidence }}</div>
                         <div class="insight-evidence">
@@ -785,34 +793,47 @@
                 <div class="insight-title"><h3>解析 / 模板待确认</h3></div>
                 {% for item in report.insights.parseFailures %}
                     <div class="insight-item">
-                        <div class="insight-id">{{ item.id }}</div>
-                        <span class="badge">{{ item.title }}</span>
+                        <div class="insight-id">{{ item.title }}</div>
                         <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
                         <div class="insight-evidence">{{ item.evidence }}</div>
+                        {% if item.locations is not empty %}
+                            <div class="insight-evidence">
+                                {% for location in item.locations %}
+                                    {{ location }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="muted">解析通过</div>
                 {% endfor %}
             </div>
             <div class="panel">
-                <div class="insight-title"><h3>EXPLAIN 跳过</h3></div>
-                {% for item in report.insights.skippedExplain %}
+                <div class="insight-title"><h3>执行计划证据</h3></div>
+                {% if report.diagnostics.skippedExplain|length > 0 %}
                     <div class="insight-item">
-                        <div class="insight-id">{{ item.id }}</div>
-                        <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
-                        <div class="insight-evidence">{{ item.evidence }}</div>
+                        <div class="insight-id">{{ report.diagnostics.skippedExplain|length }} 条 SQL 未执行 EXPLAIN</div>
+                        <span class="badge sev-INFO">GLOBAL</span>
+                        <div class="insight-evidence">这是全局证据限制，不作为逐条修复项展示；优先给修复队列中的问题 SQL 补 EXPLAIN。</div>
                     </div>
                 {% else %}
                     <div class="muted">可执行 SQL 已覆盖</div>
-                {% endfor %}
+                {% endif %}
             </div>
             <div class="panel">
                 <div class="insight-title"><h3>危险 DML</h3></div>
                 {% for item in report.insights.dangerousDml %}
                     <div class="insight-item">
-                        <div class="insight-id">{{ item.id }}</div>
+                        <div class="insight-id">{{ item.title }}</div>
                         <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
                         <div class="insight-evidence">{{ item.evidence }}</div>
+                        {% if item.locations is not empty %}
+                            <div class="insight-evidence">
+                                {% for location in item.locations %}
+                                    {{ location }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="muted">未发现高危变更语句</div>
@@ -822,9 +843,16 @@
                 <div class="insight-title"><h3>潜在注入</h3></div>
                 {% for item in report.insights.potentialInjection %}
                     <div class="insight-item">
-                        <div class="insight-id">{{ item.id }}</div>
+                        <div class="insight-id">{{ item.title }}</div>
                         <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
                         <div class="insight-evidence">{{ item.evidence }}</div>
+                        {% if item.locations is not empty %}
+                            <div class="insight-evidence">
+                                {% for location in item.locations %}
+                                    {{ location }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="muted">未发现明显注入风险</div>
@@ -834,9 +862,16 @@
                 <div class="insight-title"><h3>全表扫描 / 无索引</h3></div>
                 {% for item in report.insights.fullScanOrNoIndex %}
                     <div class="insight-item">
-                        <div class="insight-id">{{ item.id }}</div>
+                        <div class="insight-id">{{ item.title }}</div>
                         <span class="badge sev-{{ item.severity }}">{{ item.severity }}</span>
                         <div class="insight-evidence">{{ item.evidence }}</div>
+                        {% if item.locations is not empty %}
+                            <div class="insight-evidence">
+                                {% for location in item.locations %}
+                                    {{ location }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 {% else %}
                     <div class="muted">未发现执行计划索引风险</div>
@@ -849,13 +884,13 @@
         <div class="section-head">
             <div>
                 <p class="kicker">Finding Detail</p>
-                <h2>SQL 明细</h2>
-                <p class="section-subtitle">支持按问题状态、级别、文件、规则和 SQL 内容快速过滤。</p>
+                <h2>问题明细</h2>
+                <p class="section-subtitle">HTML 只呈现触发规则的问题 SQL；{{ report.summary.counts.cleanSql }} 条无问题 SQL 保留在 JSON，避免审阅噪音。</p>
             </div>
         </div>
         <div class="filter-panel">
             <div class="filter-summary">
-                <div>当前显示 <strong id="visibleCount">0</strong> / <span id="totalCount">{{ report.findings|length }}</span> 条 SQL</div>
+                <div>当前显示 <strong id="visibleCount">0</strong> / <span id="totalCount">{{ report.summary.counts.issueSql }}</span> 条问题 SQL</div>
                 <button id="clearFilters" class="report-action" type="button">清空筛选</button>
             </div>
             <div id="interactionStatus" class="interaction-status">交互初始化中。如果这里不变，请刷新本地报告。</div>
@@ -869,11 +904,6 @@
             </div>
             <div class="toolbar">
                 <input id="q" type="search" placeholder="按文件、规则、SQL 内容筛选">
-                <select id="issueState">
-                    <option value="problem" {% if report.summary.counts.totalIssues > 0 %}selected{% endif %}>仅问题 SQL</option>
-                    <option value="all" {% if report.summary.counts.totalIssues == 0 %}selected{% endif %}>全部 SQL</option>
-                    <option value="clean">无问题 SQL</option>
-                </select>
                 <select id="severity">
                     <option value="">全部级别</option>
                     <option value="CRITICAL">CRITICAL</option>
@@ -883,15 +913,22 @@
             </div>
         </div>
 
-        {% for finding in report.findings %}
-            {% set hasIssue = finding.issues is not empty %}
-            <article id="finding-{{ finding.id }}" class="finding" data-severity="{{ finding.severity }}" data-has-issue="{{ hasIssue ? 'true' : 'false' }}" data-rules="{% for issue in finding.issues %}{{ issue.type }} {% endfor %}">
+        {% if report.summary.counts.issueSql > 0 %}
+            {% for finding in report.findings %}
+                {% if finding.issues is not empty %}
+                <article id="finding-{{ finding.id }}" class="finding" data-severity="{{ finding.severity }}" data-has-issue="true" data-rules="{% for issue in finding.issues %}{{ issue.type }} {% endfor %}">
                 <div class="finding-head">
                     <div>
                         <span class="badge sev-{{ finding.severity }}">{{ finding.severity }}</span>
                         <span class="badge">{{ finding.sqlType }}</span>
                         <span class="badge">{{ finding.category }}</span>
-                        <h3>{{ finding.id }}</h3>
+                        <h3>
+                            {% for loc in finding.locations %}
+                                {% if loop.first %}{{ loc.fileName }}:{{ loc.startLine }}{% endif %}
+                            {% else %}
+                                {{ finding.sqlType }} SQL
+                            {% endfor %}
+                        </h3>
                         <div class="locations">
                             {% for loc in finding.locations %}
                                 {{ loc.filePath }}:{{ loc.startLine }} · {{ loc.sourceType }}{% if not loop.last %}<br>{% endif %}
@@ -919,26 +956,24 @@
                 {% else %}
                     <div class="issue muted">未触发静态或 EXPLAIN 问题</div>
                 {% endfor %}
-                {% if hasIssue %}
-                    <details class="sql-detail">
-                        <summary>查看 SQL</summary>
-                        <div class="sql-tools">
-                            <button class="copy-sql" type="button" data-copy-sql>复制 SQL</button>
-                        </div>
-                        <div class="sql-block-label">原始 SQL</div>
-                        <pre>{{ finding.sql.original }}</pre>
-                        {% if finding.sql.abstracted is not null and finding.sql.abstracted is not empty and finding.sql.abstracted != finding.sql.original %}
-                            <div class="sql-block-label">抽象 SQL</div>
-                            <pre>{{ finding.sql.abstracted }}</pre>
-                        {% endif %}
-                    </details>
-                {% else %}
-                    <div class="issue muted">无问题 SQL。完整 SQL 已保留在 JSON 报告，HTML 默认省略正文以保持报告简洁。</div>
+                <details class="sql-detail">
+                    <summary>查看 SQL</summary>
+                    <div class="sql-tools">
+                        <button class="copy-sql" type="button" data-copy-sql>复制 SQL</button>
+                    </div>
+                    <div class="sql-block-label">原始 SQL</div>
+                    <pre>{{ finding.sql.original }}</pre>
+                    {% if finding.sql.abstracted is not null and finding.sql.abstracted is not empty and finding.sql.abstracted != finding.sql.original %}
+                        <div class="sql-block-label">抽象 SQL</div>
+                        <pre>{{ finding.sql.abstracted }}</pre>
+                    {% endif %}
+                </details>
+                </article>
                 {% endif %}
-            </article>
+            {% endfor %}
         {% else %}
-            <div class="empty">未发现 SQL。请确认扫描路径和文件类型。</div>
-        {% endfor %}
+            <div class="empty">未发现问题 SQL。完整 SQL 清单已保留在 JSON 报告。</div>
+            {% endif %}
         <div id="emptyFiltered" class="empty" style="display:none;">当前筛选无结果</div>
     </section>
 
@@ -975,7 +1010,6 @@
 
         onReady(function () {
             var q = document.getElementById('q');
-            var issueState = document.getElementById('issueState');
             var severity = document.getElementById('severity');
             var emptyFiltered = document.getElementById('emptyFiltered');
             var visibleCount = document.getElementById('visibleCount');
@@ -998,7 +1032,7 @@
                     return;
                 }
                 interactionStatus.className = 'interaction-status ready';
-                interactionStatus.textContent = '交互已启用：可筛选、跳转、展开和复制 SQL。';
+                interactionStatus.textContent = '交互已启用：可筛选问题 SQL、跳转、展开和复制 SQL。';
             }
 
             function rowDataset(row, name) {
@@ -1040,21 +1074,18 @@
             }
 
             function applyFilters() {
-                if (!q || !issueState || !severity) {
+                if (!q || !severity) {
                     return;
                 }
                 var term = (q.value || '').toLowerCase();
-                var state = issueState.value;
                 var level = severity.value;
                 var visible = 0;
                 rows.forEach(function (row) {
                     var matchedText = !term || (row._searchText || '').indexOf(term) >= 0;
-                    var hasIssue = rowDataset(row, 'hasIssue') === 'true';
-                    var matchedIssueState = state === 'all' || (state === 'problem' && hasIssue) || (state === 'clean' && !hasIssue);
                     var matchedSeverity = !level || rowDataset(row, 'severity') === level;
                     var rules = row.getAttribute('data-rules') || '';
                     var matchedRule = !activeRule || rules.indexOf(activeRule) >= 0;
-                    var matched = matchedText && matchedIssueState && matchedSeverity && matchedRule;
+                    var matched = matchedText && matchedSeverity && matchedRule;
                     row.style.display = matched ? '' : 'none';
                     if (matched) {
                         visible++;
@@ -1074,9 +1105,6 @@
                     applyFilters();
                 });
             }
-            if (issueState) {
-                issueState.addEventListener('change', applyFilters);
-            }
             if (severity) {
                 severity.addEventListener('change', applyFilters);
             }
@@ -1084,11 +1112,6 @@
                 clearFilters.addEventListener('click', function () {
                     if (q) {
                         q.value = '';
-                    }
-                    if (issueState) {
-                        issueState.value = rows.some(function (row) {
-                            return rowDataset(row, 'hasIssue') === 'true';
-                        }) ? 'problem' : 'all';
                     }
                     if (severity) {
                         severity.value = '';
@@ -1103,9 +1126,6 @@
                     activeRule = activeRule === rule ? '' : rule;
                     if (q) {
                         q.value = '';
-                    }
-                    if (issueState) {
-                        issueState.value = 'problem';
                     }
                     if (severity) {
                         severity.value = '';

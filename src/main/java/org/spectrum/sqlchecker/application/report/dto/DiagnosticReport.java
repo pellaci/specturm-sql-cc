@@ -58,6 +58,8 @@ public class DiagnosticReport {
         private int totalFiles;
         private int totalSql;
         private int uniqueSql;
+        private int issueSql;
+        private int cleanSql;
         private int totalIssues;
         private int criticalIssues;
         private int warningIssues;

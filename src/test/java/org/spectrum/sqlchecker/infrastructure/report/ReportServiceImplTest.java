@@ -151,7 +151,8 @@ class ReportServiceImplTest {
         assertThat(json).contains("\"campaigns\"");
         assertThat(json).contains("\"confidence\"");
         assertThat(json).contains("\"methodology\"");
-        assertThat(json).contains("\"acceptanceChecklist\"");
+        assertThat(json).contains("\"issueSql\":1");
+        assertThat(json).contains("\"cleanSql\":0");
         assertThat(json).contains("\"totalIssues\":1");
         assertThat(json).contains("\"warningIssues\":1");
         assertThat(json).contains("\"infoIssues\":0");
@@ -188,11 +189,12 @@ class ReportServiceImplTest {
 
         assertThat(report.getDiagnostics().getParseFailures()).hasSize(1);
         assertThat(report.getDiagnostics().getSkippedExplain()).hasSize(3);
-        assertThat(report.getDiagnostics().getManualReview()).hasSize(3);
+        assertThat(report.getDiagnostics().getManualReview()).hasSize(2);
         assertThat(report.getDiagnostics().getManualReview())
                 .anyMatch(item -> item.contains("invalid-sql"))
-                .anyMatch(item -> item.contains("unknown-sql"))
-                .anyMatch(item -> item.contains("skipped-sql"));
+                .anyMatch(item -> item.contains("unknown-sql"));
+        assertThat(report.getDiagnostics().getManualReview())
+                .noneMatch(item -> item.contains("skipped-sql"));
     }
 
     @Test
@@ -219,7 +221,7 @@ class ReportServiceImplTest {
         service.generateHtmlReport(createManualReviewScanResult(), output.toString());
 
         String html = Files.readString(output);
-        assertThat(html).contains("需人工确认 SQL</span><strong>3</strong>");
+        assertThat(html).contains("人工复核项</span><strong>2</strong>");
     }
 
     @Test
@@ -235,7 +237,7 @@ class ReportServiceImplTest {
         assertThat(html).contains("洞察");
         assertThat(html).contains("重复 SQL");
         assertThat(html).contains("解析 / 模板待确认");
-        assertThat(html).contains("EXPLAIN 跳过");
+        assertThat(html).contains("执行计划证据");
         assertThat(html).contains("危险 DML");
         assertThat(html).contains("潜在注入");
         assertThat(html).contains("全表扫描 / 无索引");
@@ -251,11 +253,12 @@ class ReportServiceImplTest {
         service.generateHtmlReport(createInsightScanResult(), output.toString());
 
         String html = Files.readString(output);
-        assertThat(html).contains("id=\"issueState\"");
-        assertThat(html).contains("<option value=\"problem\" selected>仅问题 SQL</option>");
+        assertThat(html).doesNotContain("id=\"issueState\"");
+        assertThat(html).doesNotContain("<option value=\"problem\" selected>仅问题 SQL</option>");
         assertThat(html).contains("data-has-issue=\"true\"");
-        assertThat(html).contains("data-has-issue=\"false\"");
-        assertThat(html).contains("body:not(.interactive-ready) .finding[data-has-issue=\"false\"]");
+        assertThat(html).doesNotContain("data-has-issue=\"false\"");
+        assertThat(html).contains("条问题 SQL");
+        assertThat(html).doesNotContain("body:not(.interactive-ready) .finding[data-has-issue=\"false\"]");
         assertThat(html).contains("document.body.classList.add('interactive-ready')");
     }
 
@@ -347,8 +350,8 @@ class ReportServiceImplTest {
         service.generateHtmlReport(createCleanAndRiskyScanResult(), output.toString());
 
         String html = Files.readString(output);
-        assertThat(html).contains("clean-finding");
-        assertThat(html).contains("完整 SQL 已保留在 JSON 报告");
+        assertThat(html).doesNotContain("clean-finding");
+        assertThat(html).contains("无问题 SQL 保留在 JSON");
         assertThat(html).doesNotContain("SELECT clean_secret_payload FROM clean_table");
         assertThat(html).contains("SELECT * FROM risky_table");
     }

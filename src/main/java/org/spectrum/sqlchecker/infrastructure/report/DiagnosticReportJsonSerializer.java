@@ -54,6 +54,8 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldNumber(sb, first, "totalFiles", counts.getTotalFiles());
         first = fieldNumber(sb, first, "totalSql", counts.getTotalSql());
         first = fieldNumber(sb, first, "uniqueSql", counts.getUniqueSql());
+        first = fieldNumber(sb, first, "issueSql", counts.getIssueSql());
+        first = fieldNumber(sb, first, "cleanSql", counts.getCleanSql());
         first = fieldNumber(sb, first, "totalIssues", counts.getTotalIssues());
         first = fieldNumber(sb, first, "criticalIssues", counts.getCriticalIssues());
         first = fieldNumber(sb, first, "warningIssues", counts.getWarningIssues());

@@ -69,7 +69,8 @@ class DiagnosticReportFactoryConsultingReportTest {
         assertThat(report.getExecutiveSummary().getRecommendedActions())
                 .anySatisfy(action -> assertThat(action).contains("P0"));
         assertThat(report.getExecutiveSummary().getConfidenceSummary())
-                .contains("Manual review");
+                .contains("人工复核")
+                .contains("EXPLAIN 未执行");
     }
 
     @Test
@@ -115,8 +116,8 @@ class DiagnosticReportFactoryConsultingReportTest {
     }
 
     @Test
-    @DisplayName("should group skipped explain findings into review campaign")
-    void should_group_skipped_explain_findings_into_review_campaign() {
+    @DisplayName("should not turn clean skipped EXPLAIN items into remediation campaigns")
+    void should_not_turn_clean_skipped_explain_items_into_remediation_campaigns() {
         DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
                 .scanPath("/repo/installment-commodity")
                 .totalFiles(1)
@@ -127,10 +128,27 @@ class DiagnosticReportFactoryConsultingReportTest {
                 .build());
 
         assertThat(report.getCampaigns())
+                .noneMatch(campaign -> "p2-template-review".equals(campaign.getId()));
+    }
+
+    @Test
+    @DisplayName("should group unknown findings into template review campaign")
+    void should_group_unknown_findings_into_template_review_campaign() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-commodity")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(riskySkippedExplainSql()))
+                .build());
+
+        assertThat(report.getCampaigns())
                 .anySatisfy(campaign -> {
-                    assertThat(campaign.getId()).isEqualTo("p2-evidence-completion");
+                    assertThat(campaign.getId()).isEqualTo("p2-template-review");
                     assertThat(campaign.getPriority()).isEqualTo("P2");
                     assertThat(campaign.getEvidenceLevel()).isEqualTo("NEEDS_REVIEW");
+                    assertThat(campaign.getScope().getSqlCount()).isEqualTo(1);
                 });
     }
 
@@ -165,6 +183,26 @@ class DiagnosticReportFactoryConsultingReportTest {
                 .explainEligibility(ExplainEligibility.SKIPPED)
                 .severity(SeverityLevel.WARNING)
                 .score(80)
+                .build();
+    }
+
+    private static SqlStatementDto riskySkippedExplainSql() {
+        return SqlStatementDto.builder()
+                .id("unknown-template-query")
+                .sqlType(SqlType.SELECT)
+                .originalSql("SELECT id FROM orders WHERE <dynamic>")
+                .abstractSql("SELECT id FROM orders WHERE ?")
+                .validity(ValidityStatus.VALID)
+                .explainEligibility(ExplainEligibility.SKIPPED)
+                .severity(SeverityLevel.WARNING)
+                .score(80)
+                .staticAnalysis(StaticAnalysisDto.builder()
+                        .issues(List.of(StaticIssue.builder()
+                                .type(IssueType.UNKNOWN)
+                                .severity(SeverityLevel.WARNING)
+                                .message("动态模板需要人工复核")
+                                .build()))
+                        .build())
                 .build();
     }
 }
