@@ -21,7 +21,11 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldObject(sb, first, "hotspots", safeReport.getHotspots(), DiagnosticReportJsonSerializer::appendHotspots);
         first = fieldObject(sb, first, "insights", safeReport.getInsights(), DiagnosticReportJsonSerializer::appendInsights);
         first = fieldList(sb, first, "findings", safeReport.getFindings(), DiagnosticReportJsonSerializer::appendFinding);
-        fieldObject(sb, first, "diagnostics", safeReport.getDiagnostics(), DiagnosticReportJsonSerializer::appendDiagnostics);
+        first = fieldObject(sb, first, "diagnostics", safeReport.getDiagnostics(), DiagnosticReportJsonSerializer::appendDiagnostics);
+        first = fieldObject(sb, first, "executiveSummary", safeReport.getExecutiveSummary(), DiagnosticReportJsonSerializer::appendExecutiveSummary);
+        first = fieldList(sb, first, "campaigns", safeReport.getCampaigns(), DiagnosticReportJsonSerializer::appendCampaign);
+        first = fieldObject(sb, first, "confidence", safeReport.getConfidence(), DiagnosticReportJsonSerializer::appendConfidence);
+        fieldObject(sb, first, "methodology", safeReport.getMethodology(), DiagnosticReportJsonSerializer::appendMethodology);
         endObject(sb);
         return sb.toString();
     }
@@ -164,6 +168,56 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldStringList(sb, first, "skippedExplain", diagnostics.getSkippedExplain());
         first = fieldStringList(sb, first, "manualReview", diagnostics.getManualReview());
         fieldStringList(sb, first, "configWarnings", diagnostics.getConfigWarnings());
+        endObject(sb);
+    }
+
+    private static void appendExecutiveSummary(StringBuilder sb, DiagnosticReport.ExecutiveSummary summary) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "riskConclusion", summary.getRiskConclusion());
+        first = fieldStringList(sb, first, "topDrivers", summary.getTopDrivers());
+        first = fieldStringList(sb, first, "recommendedActions", summary.getRecommendedActions());
+        fieldString(sb, first, "confidenceSummary", summary.getConfidenceSummary());
+        endObject(sb);
+    }
+
+    private static void appendCampaign(StringBuilder sb, DiagnosticReport.RemediationCampaign campaign) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "id", campaign.getId());
+        first = fieldString(sb, first, "priority", campaign.getPriority());
+        first = fieldString(sb, first, "theme", campaign.getTheme());
+        first = fieldString(sb, first, "title", campaign.getTitle());
+        first = fieldString(sb, first, "summary", campaign.getSummary());
+        first = fieldObject(sb, first, "scope", campaign.getScope(), DiagnosticReportJsonSerializer::appendCampaignScope);
+        first = fieldString(sb, first, "evidenceLevel", campaign.getEvidenceLevel());
+        first = fieldStringList(sb, first, "recommendations", campaign.getRecommendations());
+        first = fieldStringList(sb, first, "acceptanceChecklist", campaign.getAcceptanceChecklist());
+        fieldStringList(sb, first, "findingIds", campaign.getFindingIds());
+        endObject(sb);
+    }
+
+    private static void appendCampaignScope(StringBuilder sb, DiagnosticReport.CampaignScope scope) {
+        boolean first = beginObject(sb);
+        first = fieldNumber(sb, first, "sqlCount", scope.getSqlCount());
+        first = fieldNumber(sb, first, "fileCount", scope.getFileCount());
+        first = fieldStringList(sb, first, "files", scope.getFiles());
+        fieldStringList(sb, first, "examples", scope.getExamples());
+        endObject(sb);
+    }
+
+    private static void appendConfidence(StringBuilder sb, DiagnosticReport.Confidence confidence) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "level", confidence.getLevel());
+        first = fieldStringList(sb, first, "evidenceSources", confidence.getEvidenceSources());
+        fieldStringList(sb, first, "limitations", confidence.getLimitations());
+        endObject(sb);
+    }
+
+    private static void appendMethodology(StringBuilder sb, DiagnosticReport.Methodology methodology) {
+        boolean first = beginObject(sb);
+        first = fieldStringList(sb, first, "scoring", methodology.getScoring());
+        first = fieldStringList(sb, first, "severityDefinitions", methodology.getSeverityDefinitions());
+        first = fieldStringList(sb, first, "coverageDefinitions", methodology.getCoverageDefinitions());
+        fieldStringList(sb, first, "knownLimits", methodology.getKnownLimits());
         endObject(sb);
     }
 

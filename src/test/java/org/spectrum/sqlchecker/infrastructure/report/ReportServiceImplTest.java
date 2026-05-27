@@ -147,6 +147,11 @@ class ReportServiceImplTest {
         assertThat(json).contains("\"hotspots\"");
         assertThat(json).contains("\"findings\"");
         assertThat(json).contains("\"diagnostics\"");
+        assertThat(json).contains("\"executiveSummary\"");
+        assertThat(json).contains("\"campaigns\"");
+        assertThat(json).contains("\"confidence\"");
+        assertThat(json).contains("\"methodology\"");
+        assertThat(json).contains("\"acceptanceChecklist\"");
         assertThat(json).contains("\"totalIssues\":1");
         assertThat(json).contains("\"warningIssues\":1");
         assertThat(json).contains("\"infoIssues\":0");
