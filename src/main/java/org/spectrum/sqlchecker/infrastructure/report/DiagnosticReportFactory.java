@@ -83,6 +83,14 @@ public final class DiagnosticReportFactory {
                         .build())
                 .build();
 
+        DiagnosticReport.Diagnostics diagnostics = DiagnosticReport.Diagnostics.builder()
+                .parseFailures(parseFailures(sqlStatements))
+                .skippedExplain(skippedExplain(sqlStatements))
+                .manualReview(manualReview(sqlStatements))
+                .configWarnings(explainFailures(sqlStatements))
+                .build();
+        DiagnosticReport.Confidence confidence = buildConfidence(summary, diagnostics);
+
         return DiagnosticReport.builder()
                 .metadata(DiagnosticReport.Metadata.builder()
                         .reportVersion(REPORT_VERSION)
@@ -99,24 +107,10 @@ public final class DiagnosticReportFactory {
                         .build())
                 .insights(buildInsights(sqlStatements))
                 .findings(findings)
-                .diagnostics(DiagnosticReport.Diagnostics.builder()
-                        .parseFailures(parseFailures(sqlStatements))
-                        .skippedExplain(skippedExplain(sqlStatements))
-                        .manualReview(manualReview(sqlStatements))
-                        .configWarnings(explainFailures(sqlStatements))
-                        .build())
-                .executiveSummary(DiagnosticReport.ExecutiveSummary.builder()
-                        .riskConclusion("")
-                        .topDrivers(List.of())
-                        .recommendedActions(List.of())
-                        .confidenceSummary("")
-                        .build())
+                .diagnostics(diagnostics)
+                .executiveSummary(buildExecutiveSummary(result, summary, confidence, sqlStatements))
                 .campaigns(List.of())
-                .confidence(DiagnosticReport.Confidence.builder()
-                        .level("NEEDS_REVIEW")
-                        .evidenceSources(List.of())
-                        .limitations(List.of())
-                        .build())
+                .confidence(confidence)
                 .methodology(defaultMethodology())
                 .build();
     }
@@ -136,6 +130,83 @@ public final class DiagnosticReportFactory {
                 .potentialInjection(limit(potentialInjection(sqlStatements)))
                 .fullScanOrNoIndex(limit(fullScanOrNoIndex(sqlStatements)))
                 .build();
+    }
+
+    private static DiagnosticReport.ExecutiveSummary buildExecutiveSummary(
+            ScanResult result,
+            DiagnosticReport.Summary summary,
+            DiagnosticReport.Confidence confidence,
+            List<SqlStatementDto> sqlStatements) {
+        List<String> topRules = countByRule(sqlStatements).entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(3)
+                .map(entry -> entry.getKey() + " × " + entry.getValue())
+                .toList();
+
+        List<String> actions = new ArrayList<>();
+        if (hasRule(sqlStatements, IssueType.SQL_INJECTION_RISK.name())) {
+            actions.add("P0: 先处理动态 SQL 安全止血，替换 ${} 或字符串拼接。");
+        }
+        if (hasRule(sqlStatements, IssueType.SELECT_WITHOUT_WHERE.name())
+                || hasRule(sqlStatements, IssueType.ORDER_BY_WITHOUT_LIMIT.name())) {
+            actions.add("P1: 收敛无边界读取和排序分页风险。");
+        }
+        if (actions.isEmpty()) {
+            actions.add("P2: 保留当前报告作为治理基线，持续关注人工复核项。");
+        }
+
+        String projectName = resolveProjectName(result.getScanPath());
+        String conclusion = projectName + " 当前 SQL 风险等级为 " + summary.getRiskLevel()
+                + "，共发现 " + summary.getCounts().getTotalIssues() + " 个问题，建议按修复战役推进。";
+        return DiagnosticReport.ExecutiveSummary.builder()
+                .riskConclusion(conclusion)
+                .topDrivers(topRules)
+                .recommendedActions(actions)
+                .confidenceSummary("Evidence confidence: " + confidence.getLevel()
+                        + " · Manual review " + manualReview(sqlStatements).size()
+                        + " · EXPLAIN skipped " + skippedExplain(sqlStatements).size())
+                .build();
+    }
+
+    private static DiagnosticReport.Confidence buildConfidence(
+            DiagnosticReport.Summary summary,
+            DiagnosticReport.Diagnostics diagnostics) {
+        List<String> sources = new ArrayList<>();
+        sources.add("Static AST rules");
+        if (summary.getCoverage().getExplainCoverage() > 0) {
+            sources.add("EXPLAIN evidence");
+        }
+
+        List<String> limits = new ArrayList<>();
+        if (!diagnostics.getSkippedExplain().isEmpty()) {
+            limits.add("EXPLAIN evidence is incomplete because some SQL was skipped.");
+        }
+        if (!diagnostics.getManualReview().isEmpty()) {
+            limits.add("Manual review is required for dynamic templates or evidence gaps.");
+        }
+        if (!diagnostics.getParseFailures().isEmpty()) {
+            limits.add("Some SQL could not be parsed and should be fixed before relying on aggregate conclusions.");
+        }
+
+        String level = diagnostics.getParseFailures().isEmpty()
+                && diagnostics.getManualReview().isEmpty()
+                && diagnostics.getConfigWarnings().isEmpty()
+                ? "STRONG"
+                : "NEEDS_REVIEW";
+        return DiagnosticReport.Confidence.builder()
+                .level(level)
+                .evidenceSources(sources)
+                .limitations(limits)
+                .build();
+    }
+
+    private static boolean hasRule(List<SqlStatementDto> sqlStatements, String rule) {
+        for (SqlStatementDto sql : sqlStatements) {
+            if (containsIssue(sql, rule)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static DiagnosticReport.Methodology defaultMethodology() {
