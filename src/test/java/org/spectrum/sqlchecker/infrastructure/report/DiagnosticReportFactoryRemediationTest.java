@@ -18,8 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DiagnosticReportFactoryRemediationTest {
 
     @Test
-    @DisplayName("should expose remediation summary tasks and recipes")
-    void should_expose_remediation_summary_tasks_and_recipes() {
+    @DisplayName("should expose empty remediation placeholder contract")
+    void should_expose_empty_remediation_placeholder_contract() {
         DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
                 .scanId("scan-remediation")
                 .status(ScanStatus.COMPLETED)
@@ -41,9 +41,17 @@ class DiagnosticReportFactoryRemediationTest {
                         .build()))
                 .build());
 
-        assertThat(report.getRemediation()).isNotNull();
-        assertThat(report.getRemediation().getSummary()).isNotNull();
-        assertThat(report.getRemediation().getTasks()).isNotNull();
-        assertThat(report.getRemediation().getRecipes()).isNotNull();
+        DiagnosticReport.Remediation remediation = report.getRemediation();
+        assertThat(remediation).isNotNull();
+        assertThat(remediation.getSummary()).isNotNull();
+        assertThat(remediation.getSummary().getCampaignCount()).isZero();
+        assertThat(remediation.getSummary().getTaskCount()).isZero();
+        assertThat(remediation.getSummary().getConfirmedTaskCount()).isZero();
+        assertThat(remediation.getSummary().getLikelyTaskCount()).isZero();
+        assertThat(remediation.getSummary().getReviewTaskCount()).isZero();
+        assertThat(remediation.getSummary().getEstimatedFirstPassFocus()).isEqualTo("暂无修复任务。");
+        assertThat(remediation.getCampaigns()).isEmpty();
+        assertThat(remediation.getTasks()).isEmpty();
+        assertThat(remediation.getRecipes()).isEmpty();
     }
 }
