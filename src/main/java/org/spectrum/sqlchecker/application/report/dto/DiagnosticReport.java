@@ -26,6 +26,7 @@ public class DiagnosticReport {
     private List<RemediationCampaign> campaigns;
     private Confidence confidence;
     private Methodology methodology;
+    private Remediation remediation;
 
     @Data
     @Builder
@@ -244,6 +245,67 @@ public class DiagnosticReport {
         private List<String> scoring;
         private List<String> severityDefinitions;
         private List<String> coverageDefinitions;
+        private List<String> knownLimits;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Remediation {
+        private RemediationSummary summary;
+        private List<RemediationCampaign> campaigns;
+        private List<RemediationTask> tasks;
+        private List<RepairRecipe> recipes;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RemediationSummary {
+        private int campaignCount;
+        private int taskCount;
+        private int confirmedTaskCount;
+        private int likelyTaskCount;
+        private int reviewTaskCount;
+        private String estimatedFirstPassFocus;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RemediationTask {
+        private String id;
+        private String title;
+        private String priority;
+        private String severity;
+        private String theme;
+        private String confidence;
+        private Location location;
+        private String campaignId;
+        private List<String> ruleTypes;
+        private String impact;
+        private String repairRecipeId;
+        private String recommendation;
+        private String acceptanceCheck;
+        private String evidence;
+        private SqlText sql;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RepairRecipe {
+        private String id;
+        private String title;
+        private List<String> appliesToRules;
+        private String unsafePattern;
+        private String safePattern;
+        private List<String> steps;
+        private String verification;
         private List<String> knownLimits;
     }
 

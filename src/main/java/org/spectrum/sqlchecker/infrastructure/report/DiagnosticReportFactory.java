@@ -94,6 +94,19 @@ public final class DiagnosticReportFactory {
                 .configWarnings(explainFailures(sqlStatements))
                 .build();
         DiagnosticReport.Confidence confidence = buildConfidence(summary, diagnostics);
+        DiagnosticReport.Remediation remediation = DiagnosticReport.Remediation.builder()
+                .summary(DiagnosticReport.RemediationSummary.builder()
+                        .campaignCount(0)
+                        .taskCount(0)
+                        .confirmedTaskCount(0)
+                        .likelyTaskCount(0)
+                        .reviewTaskCount(0)
+                        .estimatedFirstPassFocus("暂无修复任务。")
+                        .build())
+                .campaigns(List.of())
+                .tasks(List.of())
+                .recipes(List.of())
+                .build();
 
         return DiagnosticReport.builder()
                 .metadata(DiagnosticReport.Metadata.builder()
@@ -116,6 +129,7 @@ public final class DiagnosticReportFactory {
                 .campaigns(buildCampaigns(findings))
                 .confidence(confidence)
                 .methodology(defaultMethodology())
+                .remediation(remediation)
                 .build();
     }
 
