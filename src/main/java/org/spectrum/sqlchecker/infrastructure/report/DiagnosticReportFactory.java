@@ -108,7 +108,7 @@ public final class DiagnosticReportFactory {
                 .insights(buildInsights(sqlStatements))
                 .findings(findings)
                 .diagnostics(diagnostics)
-                .executiveSummary(buildExecutiveSummary(result, summary, confidence, sqlStatements))
+                .executiveSummary(buildExecutiveSummary(result, summary, confidence, diagnostics, sqlStatements))
                 .campaigns(List.of())
                 .confidence(confidence)
                 .methodology(defaultMethodology())
@@ -136,6 +136,7 @@ public final class DiagnosticReportFactory {
             ScanResult result,
             DiagnosticReport.Summary summary,
             DiagnosticReport.Confidence confidence,
+            DiagnosticReport.Diagnostics diagnostics,
             List<SqlStatementDto> sqlStatements) {
         List<String> topRules = countByRule(sqlStatements).entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
@@ -163,8 +164,8 @@ public final class DiagnosticReportFactory {
                 .topDrivers(topRules)
                 .recommendedActions(actions)
                 .confidenceSummary("Evidence confidence: " + confidence.getLevel()
-                        + " · Manual review " + manualReview(sqlStatements).size()
-                        + " · EXPLAIN skipped " + skippedExplain(sqlStatements).size())
+                        + " · Manual review " + diagnostics.getManualReview().size()
+                        + " · EXPLAIN skipped " + diagnostics.getSkippedExplain().size())
                 .build();
     }
 
