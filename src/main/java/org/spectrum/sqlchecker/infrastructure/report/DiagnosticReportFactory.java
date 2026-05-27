@@ -109,7 +109,7 @@ public final class DiagnosticReportFactory {
                 .findings(findings)
                 .diagnostics(diagnostics)
                 .executiveSummary(buildExecutiveSummary(result, summary, confidence, diagnostics, sqlStatements))
-                .campaigns(List.of())
+                .campaigns(buildCampaigns(findings, sqlStatements))
                 .confidence(confidence)
                 .methodology(defaultMethodology())
                 .build();
@@ -130,6 +130,115 @@ public final class DiagnosticReportFactory {
                 .potentialInjection(limit(potentialInjection(sqlStatements)))
                 .fullScanOrNoIndex(limit(fullScanOrNoIndex(sqlStatements)))
                 .build();
+    }
+
+    private static List<DiagnosticReport.RemediationCampaign> buildCampaigns(
+            List<DiagnosticReport.Finding> findings,
+            List<SqlStatementDto> sqlStatements) {
+        List<DiagnosticReport.RemediationCampaign> campaigns = new ArrayList<>();
+        addCampaign(campaigns, campaignForRule(
+                "p0-dynamic-sql-safety",
+                "P0",
+                "SAFETY",
+                "动态 SQL 安全止血",
+                "集中处理 ${}、字符串拼接和潜在注入风险，先消除可导致越权查询或 SQL 注入的入口。",
+                "STRONG",
+                findings,
+                List.of("SQL_INJECTION_RISK", "DYNAMIC_SQL"),
+                List.of("把 ${} 改为参数绑定；动态列名和排序字段使用白名单映射。"),
+                List.of("重新扫描并确认该战役 finding 数为 0。", "为动态排序/筛选分支补充单元或集成测试。")));
+        addCampaign(campaigns, campaignForRule(
+                "p1-unbounded-query-containment",
+                "P1",
+                "PERFORMANCE",
+                "无边界查询和排序风险收敛",
+                "处理 SELECT 无 WHERE、ORDER BY 无 LIMIT、潜在全表扫描等会扩大数据库负载的查询。",
+                "MEDIUM",
+                findings,
+                List.of("SELECT_WITHOUT_WHERE", "ORDER_BY_WITHOUT_LIMIT", "MISSING_INDEX", "NO_INDEX_USED", "FULL_TABLE_SCAN"),
+                List.of("补充可命中索引的过滤条件、分页边界，并用 EXPLAIN 验证访问路径。"),
+                List.of("重新扫描确认 P1 高风险项下降。", "对关键查询执行 EXPLAIN 并记录访问类型、行数和索引命中。")));
+        List<DiagnosticReport.Finding> reviewFindings = findings.stream()
+                .filter(finding -> finding.getExplain() != null && !"SUPPORTED".equals(finding.getExplain().getEligibility()))
+                .toList();
+        if (!reviewFindings.isEmpty()) {
+            campaigns.add(campaign(
+                    "p2-evidence-completion",
+                    "P2",
+                    "MAINTAINABILITY",
+                    "证据补齐与模板复核",
+                    "补齐 EXPLAIN 证据和人工复核动态模板，降低报告中的不可证明项。",
+                    "NEEDS_REVIEW",
+                    reviewFindings,
+                    List.of("为关键查询配置安全 EXPLAIN；对动态模板记录白名单和业务边界。"),
+                    List.of("重新扫描并确认 manual review 和 skipped EXPLAIN 数下降。")));
+        }
+        return campaigns;
+    }
+
+    private static DiagnosticReport.RemediationCampaign campaignForRule(
+            String id,
+            String priority,
+            String theme,
+            String title,
+            String summary,
+            String evidenceLevel,
+            List<DiagnosticReport.Finding> findings,
+            List<String> rules,
+            List<String> recommendations,
+            List<String> checklist) {
+        List<DiagnosticReport.Finding> matched = findings.stream()
+                .filter(finding -> finding.getIssues() != null && finding.getIssues().stream()
+                        .anyMatch(issue -> rules.contains(issue.getType())))
+                .toList();
+        return matched.isEmpty() ? null : campaign(id, priority, theme, title, summary, evidenceLevel, matched, recommendations, checklist);
+    }
+
+    private static DiagnosticReport.RemediationCampaign campaign(
+            String id,
+            String priority,
+            String theme,
+            String title,
+            String summary,
+            String evidenceLevel,
+            List<DiagnosticReport.Finding> findings,
+            List<String> recommendations,
+            List<String> checklist) {
+        List<String> files = findings.stream()
+                .flatMap(finding -> finding.getLocations() != null ? finding.getLocations().stream() : List.<DiagnosticReport.Location>of().stream())
+                .map(DiagnosticReport.Location::getFilePath)
+                .filter(path -> path != null && !path.isBlank())
+                .distinct()
+                .limit(6)
+                .toList();
+        List<String> examples = findings.stream()
+                .map(DiagnosticReport.Finding::getId)
+                .limit(5)
+                .toList();
+        return DiagnosticReport.RemediationCampaign.builder()
+                .id(id)
+                .priority(priority)
+                .theme(theme)
+                .title(title)
+                .summary(summary)
+                .scope(DiagnosticReport.CampaignScope.builder()
+                        .sqlCount(findings.size())
+                        .fileCount(files.size())
+                        .files(files)
+                        .examples(examples)
+                        .build())
+                .evidenceLevel(evidenceLevel)
+                .recommendations(recommendations)
+                .acceptanceChecklist(checklist)
+                .findingIds(findings.stream().map(DiagnosticReport.Finding::getId).toList())
+                .build();
+    }
+
+    private static void addCampaign(List<DiagnosticReport.RemediationCampaign> campaigns,
+                                    DiagnosticReport.RemediationCampaign campaign) {
+        if (campaign != null) {
+            campaigns.add(campaign);
+        }
     }
 
     private static DiagnosticReport.ExecutiveSummary buildExecutiveSummary(

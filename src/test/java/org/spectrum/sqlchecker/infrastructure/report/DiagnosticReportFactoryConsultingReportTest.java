@@ -91,6 +91,49 @@ class DiagnosticReportFactoryConsultingReportTest {
                 .anySatisfy(limit -> assertThat(limit).contains("Static analysis"));
     }
 
+    @Test
+    @DisplayName("should group injection findings into P0 remediation campaign")
+    void should_group_injection_findings_into_p0_remediation_campaign() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-commodity")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(dynamicInjectionSql()))
+                .build());
+
+        assertThat(report.getCampaigns())
+                .anySatisfy(campaign -> {
+                    assertThat(campaign.getId()).isEqualTo("p0-dynamic-sql-safety");
+                    assertThat(campaign.getPriority()).isEqualTo("P0");
+                    assertThat(campaign.getTheme()).isEqualTo("SAFETY");
+                    assertThat(campaign.getFindingIds()).contains("dynamic-order");
+                    assertThat(campaign.getAcceptanceChecklist())
+                            .anySatisfy(item -> assertThat(item).contains("重新扫描"));
+                });
+    }
+
+    @Test
+    @DisplayName("should group skipped explain findings into review campaign")
+    void should_group_skipped_explain_findings_into_review_campaign() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-commodity")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(skippedExplainSql()))
+                .build());
+
+        assertThat(report.getCampaigns())
+                .anySatisfy(campaign -> {
+                    assertThat(campaign.getId()).isEqualTo("p2-evidence-completion");
+                    assertThat(campaign.getPriority()).isEqualTo("P2");
+                    assertThat(campaign.getEvidenceLevel()).isEqualTo("NEEDS_REVIEW");
+                });
+    }
+
     private static SqlStatementDto dynamicInjectionSql() {
         return SqlStatementDto.builder()
                 .id("dynamic-order")
