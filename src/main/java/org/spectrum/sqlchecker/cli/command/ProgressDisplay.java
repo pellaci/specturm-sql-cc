@@ -176,11 +176,12 @@ public class ProgressDisplay {
                                   double parseRate, int parseFailures, int critical, int warning, int info,
                                   long duration, String reportPath, String jsonReportPath) {
         showSimpleResult(totalFiles, javaFiles, xmlFiles, sqlFiles, sqlFound, uniqueSql, parseRate, parseFailures,
-                0, 0, critical, warning, info, duration, reportPath, jsonReportPath);
+                0, 0, 0, 0, 0, 0, critical, warning, info, duration, reportPath, jsonReportPath);
     }
 
     public void showSimpleResult(int totalFiles, int javaFiles, int xmlFiles, int sqlFiles, int sqlFound, int uniqueSql,
                                   double parseRate, int parseFailures, int manualReview, int skippedExplain,
+                                  int remediationTasks, int p0Tasks, int p1Tasks, int p2Tasks,
                                   int critical, int warning, int info, long duration, String reportPath, String jsonReportPath) {
         out.println();
         out.println("═══════════════════════════════════════════════════════════════");
@@ -193,6 +194,7 @@ public class ProgressDisplay {
         out.println("  Parse failures:   " + parseFailures);
         out.println("  Manual review:    " + manualReview);
         out.println("  EXPLAIN skipped:  " + skippedExplain);
+        out.println("  Remediation tasks: " + remediationTasks + " (P0 " + p0Tasks + " / P1 " + p1Tasks + " / P2 " + p2Tasks + ")");
         out.println("  Duration:         " + duration + "ms");
         out.println();
 

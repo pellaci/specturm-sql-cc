@@ -189,6 +189,13 @@ public class ScanCommand implements Callable<Integer> {
         int skippedExplain = report.getDiagnostics().getSkippedExplain() == null
                 ? 0
                 : report.getDiagnostics().getSkippedExplain().size();
+        DiagnosticReport.Remediation remediation = report.getRemediation();
+        int remediationTasks = remediation != null && remediation.getSummary() != null
+                ? remediation.getSummary().getTaskCount()
+                : 0;
+        int p0Tasks = countTasksByPriority(remediation, "P0");
+        int p1Tasks = countTasksByPriority(remediation, "P1");
+        int p2Tasks = countTasksByPriority(remediation, "P2");
         if (progressDisplay != null) {
             progressDisplay.showSimpleResult(
                     stats.getTotalFiles(),
@@ -201,6 +208,10 @@ public class ScanCommand implements Callable<Integer> {
                     parseFailures,
                     manualReview,
                     skippedExplain,
+                    remediationTasks,
+                    p0Tasks,
+                    p1Tasks,
+                    p2Tasks,
                     counts.getCriticalIssues(),
                     counts.getWarningIssues(),
                     counts.getInfoIssues(),
@@ -221,6 +232,8 @@ public class ScanCommand implements Callable<Integer> {
         System.out.println("  Parse failures:   " + parseFailures);
         System.out.println("  Manual review:    " + manualReview);
         System.out.println("  EXPLAIN skipped:  " + skippedExplain);
+        System.out.println("  Remediation tasks: " + remediationTasks + " (P0 " + p0Tasks
+                + " / P1 " + p1Tasks + " / P2 " + p2Tasks + ")");
         System.out.println("  Duration:         " + stats.getDurationMs() + "ms");
         System.out.println();
         System.out.println("Issue Summary:");
@@ -231,5 +244,14 @@ public class ScanCommand implements Callable<Integer> {
         System.out.println("HTML report: " + reportPath);
         System.out.println("JSON report: " + jsonReportPath);
         System.out.println();
+    }
+
+    private int countTasksByPriority(DiagnosticReport.Remediation remediation, String priority) {
+        if (remediation == null || remediation.getTasks() == null) {
+            return 0;
+        }
+        return (int) remediation.getTasks().stream()
+                .filter(task -> priority.equals(task.getPriority()))
+                .count();
     }
 }
