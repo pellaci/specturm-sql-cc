@@ -115,7 +115,7 @@
         .toc a:hover { background: var(--accent-soft); color: var(--accent); }
         .report-main { min-width: 0; }
         .metrics { grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0 0 16px; }
-        .metric, .panel, .finding, .priority-item, .executive-panel {
+        .metric, .panel, .finding, .priority-item, .executive-panel, .remediation-task {
             background: var(--panel);
             border: 1px solid var(--line);
             border-radius: 6px;
@@ -358,14 +358,14 @@
         }
         .filter-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
         .filter-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-        .finding { margin-bottom: 14px; padding: 18px; }
+        .remediation-task, .finding { margin-bottom: 14px; padding: 18px; }
         .finding-head {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 16px;
             align-items: start;
         }
-        .finding h3 { margin-top: 2px; overflow-wrap: anywhere; }
+        .remediation-task h3, .finding h3 { margin-top: 2px; overflow-wrap: anywhere; }
         .badge {
             display: inline-flex;
             align-items: center;
@@ -424,7 +424,7 @@
             text-align: right;
         }
         .mini-score span { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; }
-        .mini-score strong { display: block; color: var(--ink); font-size: 24px; line-height: 1.1; }
+        .mini-score strong { display: block; color: var(--ink); font-size: 24px; line-height: 1.1; overflow-wrap: anywhere; }
         .sql-detail {
             margin-top: 14px;
             border: 1px solid var(--line-soft);
@@ -441,6 +441,12 @@
             display: flex;
             justify-content: flex-end;
             padding: 0 12px 10px;
+        }
+        .task-tools {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
         }
         .copy-sql {
             border: 1px solid var(--line);
@@ -486,7 +492,7 @@
             body { background: #ffffff; }
             .shell { max-width: none; padding: 0; }
             .toolbar, .toc, .filter-panel, script { display: none; }
-            .panel, .metric, .finding, .priority-item, .campaign-card, .executive-panel, .risk-card { break-inside: avoid; }
+            .panel, .metric, .finding, .remediation-task, .priority-item, .campaign-card, .executive-panel, .risk-card { break-inside: avoid; }
         }
     </style>
 </head>
@@ -510,8 +516,11 @@
         <aside class="toc" aria-label="报告目录">
             <p class="toc-title">Report Map</p>
             <a href="#overview">总览</a>
+            <a href="#governance">治理简报</a>
             <a href="#brief">审计结论</a>
             <a href="#campaigns">修复战役</a>
+            <a href="#recipes">修复配方</a>
+            <a href="#tasks">修复任务</a>
             <a href="#queue">修复队列</a>
             <a href="#hotspots">风险热点</a>
             <a href="#insights">诊断洞察</a>
@@ -526,6 +535,23 @@
         <div class="metric"><div class="value">{{ report.summary.counts.totalIssues }}</div><div class="label">问题项：C {{ report.summary.counts.criticalIssues }} / W {{ report.summary.counts.warningIssues }}</div></div>
         <div class="metric"><div class="value">{{ report.summary.coverage.parseRate|numberFormat }}%</div><div class="label">解析覆盖率</div></div>
         <div class="metric"><div class="value">{{ report.summary.coverage.explainCoverage|numberFormat }}%</div><div class="label">EXPLAIN 覆盖率</div></div>
+    </section>
+
+    <section id="governance" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Governance Brief</p>
+                <h2>治理简报</h2>
+                <p class="section-subtitle">{{ report.remediation.summary.estimatedFirstPassFocus }}</p>
+            </div>
+        </div>
+        <div class="grid metrics">
+            <div class="metric"><div class="value">{{ report.remediation.summary.taskCount }}</div><div class="label">修复任务</div></div>
+            <div class="metric"><div class="value">{{ report.remediation.summary.campaignCount }}</div><div class="label">修复战役</div></div>
+            <div class="metric"><div class="value">{{ report.remediation.summary.confirmedTaskCount }}</div><div class="label">确定问题</div></div>
+            <div class="metric"><div class="value">{{ report.remediation.summary.likelyTaskCount }}</div><div class="label">高可信推断</div></div>
+            <div class="metric"><div class="value">{{ report.remediation.summary.reviewTaskCount }}</div><div class="label">需人工复核</div></div>
+        </div>
     </section>
 
     <section class="decision-strip" aria-label="关键处置摘要">
@@ -880,6 +906,69 @@
         </div>
     </section>
 
+    <section id="recipes" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Repair Recipes</p>
+                <h2>修复配方</h2>
+                <p class="section-subtitle">把重复出现的问题转成稳定修复模式，减少每条 SQL 从零判断。</p>
+            </div>
+        </div>
+        <div class="grid columns">
+            {% for recipe in report.remediation.recipes %}
+                <article class="panel">
+                    <h3>{{ recipe.title }}</h3>
+                    <div class="field"><span>适用</span><div>{{ recipe.appliesToRules|join(', ') }}</div></div>
+                    <div class="field"><span>风险</span><div>{{ recipe.unsafePattern }}</div></div>
+                    <div class="field"><span>安全</span><div>{{ recipe.safePattern }}</div></div>
+                    <div class="field"><span>步骤</span><ul>{% for step in recipe.steps %}<li>{{ step }}</li>{% endfor %}</ul></div>
+                    <div class="field"><span>验收</span><div>{{ recipe.verification }}</div></div>
+                </article>
+            {% else %}
+                <div class="empty">未生成修复配方。</div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section id="tasks" class="section">
+        <div class="section-head">
+            <div>
+                <p class="kicker">Task Detail</p>
+                <h2>修复任务</h2>
+                <p class="section-subtitle">任务面向派单和验收；完整 SQL 诊断仍保留在问题明细和 JSON。</p>
+            </div>
+        </div>
+        {% if report.remediation.tasks is not empty %}
+            {% for task in report.remediation.tasks %}
+                <article id="{{ task.id }}" class="remediation-task" data-severity="{{ task.severity }}" data-rules="{{ task.ruleTypes|join(' ') }}">
+                    <div class="finding-head">
+                        <div>
+                            <span class="badge">{{ task.priority }}</span>
+                            <span class="badge sev-{{ task.severity }}">{{ task.severity }}</span>
+                            <span class="badge">{{ task.theme }}</span>
+                            <span class="badge">{{ task.confidence }}</span>
+                            <h3>{{ task.title }}</h3>
+                            <div class="locations">{{ task.location.filePath }}:{{ task.location.startLine }} · {{ task.location.sourceType }}</div>
+                        </div>
+                        <div class="mini-score"><span>Recipe</span><strong>{{ task.repairRecipeId }}</strong></div>
+                    </div>
+                    <div class="issue">
+                        <div class="field"><span>影响</span><div>{{ task.impact }}</div></div>
+                        <div class="field"><span>建议</span><div>{{ task.recommendation }}</div></div>
+                        <div class="field"><span>验收</span><div>{{ task.acceptanceCheck }}</div></div>
+                        <div class="field"><span>证据</span><div>{{ task.evidence }}</div></div>
+                        <div class="task-tools">
+                            <button class="report-action copy-task-summary" type="button" data-task-summary="{{ task.title }} | {{ task.priority }} | {{ task.recommendation }}">复制任务摘要</button>
+                            <button class="report-action copy-acceptance" type="button" data-acceptance="{{ task.acceptanceCheck }}">复制验收条件</button>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        {% else %}
+            <div class="empty">未生成修复任务。完整扫描结果仍保留在 JSON。</div>
+        {% endif %}
+    </section>
+
     <section id="details" class="section">
         <div class="section-head">
             <div>
@@ -1018,6 +1107,8 @@
             var rows = toArray(document.querySelectorAll('.finding'));
             var ruleFilters = toArray(document.querySelectorAll('[data-rule-filter]'));
             var copyButtons = toArray(document.querySelectorAll('[data-copy-sql]'));
+            var copyTaskSummaryButtons = toArray(document.querySelectorAll('.copy-task-summary'));
+            var copyAcceptanceButtons = toArray(document.querySelectorAll('.copy-acceptance'));
             var priorityItems = toArray(document.querySelectorAll('.priority-item'));
             var priorityToggle = document.getElementById('priorityToggle');
             var priorityLimit = 12;
@@ -1042,6 +1133,42 @@
                 return row.getAttribute('data-' + name.replace(/[A-Z]/g, function (letter) {
                     return '-' + letter.toLowerCase();
                 })) || '';
+            }
+
+            function markCopied(button, original) {
+                button.textContent = '已复制';
+                setTimeout(function () {
+                    button.textContent = original;
+                }, 1200);
+            }
+
+            function selectNode(node) {
+                if (!node) {
+                    return;
+                }
+                var range = document.createRange();
+                range.selectNodeContents(node);
+                var selection = window.getSelection ? window.getSelection() : null;
+                if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
+            }
+
+            function copyText(text, button, fallbackNode) {
+                if (!text || !button) {
+                    return;
+                }
+                var original = button.textContent;
+                if (window.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function () {
+                        markCopied(button, original);
+                    }).catch(function () {
+                        selectNode(fallbackNode);
+                    });
+                } else {
+                    selectNode(fallbackNode);
+                }
             }
 
             rows.forEach(function (row) {
@@ -1143,33 +1270,17 @@
                     var finding = button.closest ? button.closest('.finding') : null;
                     var pre = finding ? finding.querySelector('pre') : null;
                     var sql = pre ? pre.textContent : '';
-                    if (!sql) {
-                        return;
-                    }
-                    var original = button.textContent;
-                    function markCopied() {
-                        button.textContent = '已复制';
-                        setTimeout(function () {
-                            button.textContent = original;
-                        }, 1200);
-                    }
-                    function selectSql() {
-                        if (!pre) {
-                            return;
-                        }
-                        var range = document.createRange();
-                        range.selectNodeContents(pre);
-                        var selection = window.getSelection ? window.getSelection() : null;
-                        if (selection) {
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                        }
-                    }
-                    if (window.navigator && navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(sql).then(markCopied).catch(selectSql);
-                    } else {
-                        selectSql();
-                    }
+                    copyText(sql, button, pre);
+                });
+            });
+            copyTaskSummaryButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    copyText(button.getAttribute('data-task-summary') || '', button, null);
+                });
+            });
+            copyAcceptanceButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    copyText(button.getAttribute('data-acceptance') || '', button, null);
                 });
             });
             if (priorityToggle) {

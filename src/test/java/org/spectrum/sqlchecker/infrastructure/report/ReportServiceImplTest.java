@@ -152,12 +152,29 @@ class ReportServiceImplTest {
         assertThat(json).contains("\"confidence\"");
         assertThat(json).contains("\"methodology\"");
         assertThat(json).contains("\"remediation\"");
-        assertThat(json).contains("\"summary\"");
+        assertThat(json).contains("\"remediation\":{\"summary\":");
         assertThat(json).contains("\"taskCount\":1");
+        assertThat(json).contains(
+                "\"summary\":{\"campaignCount\":0,\"taskCount\":1,\"confirmedTaskCount\":0,"
+                        + "\"likelyTaskCount\":1,\"reviewTaskCount\":0,"
+                        + "\"estimatedFirstPassFocus\":\"优先复核模板和低风险正确性任务。\"}");
         assertThat(json).contains("\"tasks\"");
+        assertThat(json).contains(
+                "\"tasks\":[{\"id\":\"sql-1-remediation-select_star\","
+                        + "\"title\":\"UserMapper.xml:12 · SELECT_STAR\","
+                        + "\"priority\":\"P2\",\"severity\":\"WARNING\",\"theme\":\"CORRECTNESS\","
+                        + "\"confidence\":\"LIKELY\"");
         assertThat(json).contains("\"recipes\"");
         assertThat(json).contains("\"repairRecipeId\"");
         assertThat(json).contains("\"select-star-field-list\"");
+        assertThat(json).contains(
+                "\"id\":\"select-star-field-list\",\"title\":\"SELECT * 改为字段清单\","
+                        + "\"appliesToRules\":[\"SELECT_STAR\"],\"unsafePattern\":\"SELECT *\","
+                        + "\"safePattern\":\"SELECT id, status, updated_at\","
+                        + "\"steps\":[\"确认调用方实际读取字段。\",\"替换为稳定字段清单。\","
+                        + "\"回归序列化和映射结果。\"],"
+                        + "\"verification\":\"重新扫描确认 SELECT_STAR 消失。\","
+                        + "\"knownLimits\":[\"字段清单需随业务 DTO 演进同步维护。\"]");
         assertThat(json).contains("\"issueSql\":1");
         assertThat(json).contains("\"cleanSql\":0");
         assertThat(json).contains("\"totalIssues\":1");
@@ -302,6 +319,13 @@ class ReportServiceImplTest {
         assertThat(html).contains("Remediation Campaigns");
         assertThat(html).contains("Evidence Confidence");
         assertThat(html).contains("Methodology");
+        assertThat(html).contains("治理简报");
+        assertThat(html).contains("修复任务");
+        assertThat(html).contains("Repair Recipes");
+        assertThat(html).contains("修复配方");
+        assertThat(html).contains("Task Detail");
+        assertThat(html).contains("复制任务摘要");
+        assertThat(html).contains("复制验收条件");
         assertThat(html).contains("acceptance-checklist");
         assertThat(html).contains("href=\"#finding-");
     }
