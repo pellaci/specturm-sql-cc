@@ -25,7 +25,8 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldObject(sb, first, "executiveSummary", safeReport.getExecutiveSummary(), DiagnosticReportJsonSerializer::appendExecutiveSummary);
         first = fieldList(sb, first, "campaigns", safeReport.getCampaigns(), DiagnosticReportJsonSerializer::appendCampaign);
         first = fieldObject(sb, first, "confidence", safeReport.getConfidence(), DiagnosticReportJsonSerializer::appendConfidence);
-        fieldObject(sb, first, "methodology", safeReport.getMethodology(), DiagnosticReportJsonSerializer::appendMethodology);
+        first = fieldObject(sb, first, "methodology", safeReport.getMethodology(), DiagnosticReportJsonSerializer::appendMethodology);
+        fieldObject(sb, first, "remediation", safeReport.getRemediation(), DiagnosticReportJsonSerializer::appendRemediation);
         endObject(sb);
         return sb.toString();
     }
@@ -220,6 +221,59 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldStringList(sb, first, "severityDefinitions", methodology.getSeverityDefinitions());
         first = fieldStringList(sb, first, "coverageDefinitions", methodology.getCoverageDefinitions());
         fieldStringList(sb, first, "knownLimits", methodology.getKnownLimits());
+        endObject(sb);
+    }
+
+    private static void appendRemediation(StringBuilder sb, DiagnosticReport.Remediation remediation) {
+        boolean first = beginObject(sb);
+        first = fieldObject(sb, first, "summary", remediation.getSummary(), DiagnosticReportJsonSerializer::appendRemediationSummary);
+        first = fieldList(sb, first, "campaigns", remediation.getCampaigns(), DiagnosticReportJsonSerializer::appendCampaign);
+        first = fieldList(sb, first, "tasks", remediation.getTasks(), DiagnosticReportJsonSerializer::appendRemediationTask);
+        fieldList(sb, first, "recipes", remediation.getRecipes(), DiagnosticReportJsonSerializer::appendRepairRecipe);
+        endObject(sb);
+    }
+
+    private static void appendRemediationSummary(StringBuilder sb, DiagnosticReport.RemediationSummary summary) {
+        boolean first = beginObject(sb);
+        first = fieldNumber(sb, first, "campaignCount", summary.getCampaignCount());
+        first = fieldNumber(sb, first, "taskCount", summary.getTaskCount());
+        first = fieldNumber(sb, first, "confirmedTaskCount", summary.getConfirmedTaskCount());
+        first = fieldNumber(sb, first, "likelyTaskCount", summary.getLikelyTaskCount());
+        first = fieldNumber(sb, first, "reviewTaskCount", summary.getReviewTaskCount());
+        fieldString(sb, first, "estimatedFirstPassFocus", summary.getEstimatedFirstPassFocus());
+        endObject(sb);
+    }
+
+    private static void appendRemediationTask(StringBuilder sb, DiagnosticReport.RemediationTask task) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "id", task.getId());
+        first = fieldString(sb, first, "title", task.getTitle());
+        first = fieldString(sb, first, "priority", task.getPriority());
+        first = fieldString(sb, first, "severity", task.getSeverity());
+        first = fieldString(sb, first, "theme", task.getTheme());
+        first = fieldString(sb, first, "confidence", task.getConfidence());
+        first = fieldObject(sb, first, "location", task.getLocation(), DiagnosticReportJsonSerializer::appendLocation);
+        first = fieldString(sb, first, "campaignId", task.getCampaignId());
+        first = fieldStringList(sb, first, "ruleTypes", task.getRuleTypes());
+        first = fieldString(sb, first, "impact", task.getImpact());
+        first = fieldString(sb, first, "repairRecipeId", task.getRepairRecipeId());
+        first = fieldString(sb, first, "recommendation", task.getRecommendation());
+        first = fieldString(sb, first, "acceptanceCheck", task.getAcceptanceCheck());
+        first = fieldString(sb, first, "evidence", task.getEvidence());
+        fieldObject(sb, first, "sql", task.getSql(), DiagnosticReportJsonSerializer::appendSqlText);
+        endObject(sb);
+    }
+
+    private static void appendRepairRecipe(StringBuilder sb, DiagnosticReport.RepairRecipe recipe) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "id", recipe.getId());
+        first = fieldString(sb, first, "title", recipe.getTitle());
+        first = fieldStringList(sb, first, "appliesToRules", recipe.getAppliesToRules());
+        first = fieldString(sb, first, "unsafePattern", recipe.getUnsafePattern());
+        first = fieldString(sb, first, "safePattern", recipe.getSafePattern());
+        first = fieldStringList(sb, first, "steps", recipe.getSteps());
+        first = fieldString(sb, first, "verification", recipe.getVerification());
+        fieldStringList(sb, first, "knownLimits", recipe.getKnownLimits());
         endObject(sb);
     }
 

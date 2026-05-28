@@ -151,6 +151,13 @@ class ReportServiceImplTest {
         assertThat(json).contains("\"campaigns\"");
         assertThat(json).contains("\"confidence\"");
         assertThat(json).contains("\"methodology\"");
+        assertThat(json).contains("\"remediation\"");
+        assertThat(json).contains("\"summary\"");
+        assertThat(json).contains("\"taskCount\":1");
+        assertThat(json).contains("\"tasks\"");
+        assertThat(json).contains("\"recipes\"");
+        assertThat(json).contains("\"repairRecipeId\"");
+        assertThat(json).contains("\"select-star-field-list\"");
         assertThat(json).contains("\"issueSql\":1");
         assertThat(json).contains("\"cleanSql\":0");
         assertThat(json).contains("\"totalIssues\":1");
