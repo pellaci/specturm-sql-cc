@@ -94,19 +94,8 @@ public final class DiagnosticReportFactory {
                 .configWarnings(explainFailures(sqlStatements))
                 .build();
         DiagnosticReport.Confidence confidence = buildConfidence(summary, diagnostics);
-        DiagnosticReport.Remediation remediation = DiagnosticReport.Remediation.builder()
-                .summary(DiagnosticReport.RemediationSummary.builder()
-                        .campaignCount(0)
-                        .taskCount(0)
-                        .confirmedTaskCount(0)
-                        .likelyTaskCount(0)
-                        .reviewTaskCount(0)
-                        .estimatedFirstPassFocus("暂无修复任务。")
-                        .build())
-                .campaigns(List.of())
-                .tasks(List.of())
-                .recipes(List.of())
-                .build();
+        List<DiagnosticReport.RemediationCampaign> campaigns = buildCampaigns(findings);
+        DiagnosticReport.Remediation remediation = buildRemediation(findings, campaigns);
 
         return DiagnosticReport.builder()
                 .metadata(DiagnosticReport.Metadata.builder()
@@ -126,7 +115,7 @@ public final class DiagnosticReportFactory {
                 .findings(findings)
                 .diagnostics(diagnostics)
                 .executiveSummary(buildExecutiveSummary(result, summary, confidence, diagnostics, sqlStatements))
-                .campaigns(buildCampaigns(findings))
+                .campaigns(campaigns)
                 .confidence(confidence)
                 .methodology(defaultMethodology())
                 .remediation(remediation)
@@ -186,6 +175,376 @@ public final class DiagnosticReportFactory {
                 List.of("定位 MyBatis 动态分支、数据库方言或占位符归一化问题，补齐最小样例后重新扫描。"),
                 List.of("重新扫描并确认 UNKNOWN/SQL_SYNTAX_ERROR 已下降，或被归类到明确规则。")));
         return campaigns;
+    }
+
+    private static DiagnosticReport.Remediation buildRemediation(
+            List<DiagnosticReport.Finding> findings,
+            List<DiagnosticReport.RemediationCampaign> campaigns) {
+        List<DiagnosticReport.RemediationTask> tasks = buildRemediationTasks(findings);
+        int confirmed = countTasksByConfidence(tasks, "CONFIRMED");
+        int likely = countTasksByConfidence(tasks, "LIKELY");
+        int review = countTasksByConfidence(tasks, "NEEDS_REVIEW");
+        return DiagnosticReport.Remediation.builder()
+                .summary(DiagnosticReport.RemediationSummary.builder()
+                        .campaignCount(campaigns.size())
+                        .taskCount(tasks.size())
+                        .confirmedTaskCount(confirmed)
+                        .likelyTaskCount(likely)
+                        .reviewTaskCount(review)
+                        .estimatedFirstPassFocus(estimatedFirstPassFocus(tasks))
+                        .build())
+                .campaigns(campaigns)
+                .tasks(tasks)
+                .recipes(defaultRepairRecipes())
+                .build();
+    }
+
+    private static List<DiagnosticReport.RemediationTask> buildRemediationTasks(List<DiagnosticReport.Finding> findings) {
+        List<DiagnosticReport.RemediationTask> tasks = new ArrayList<>();
+        for (DiagnosticReport.Finding finding : findings) {
+            if (finding.getIssues() == null || finding.getIssues().isEmpty()) {
+                continue;
+            }
+            DiagnosticReport.Issue primaryIssue = finding.getIssues().get(0);
+            String primaryRule = safe(primaryIssue.getType(), "UNKNOWN");
+            List<String> ruleTypes = ruleTypes(finding);
+            String priority = remediationPriority(ruleTypes, finding.getSeverity());
+            String theme = remediationTheme(ruleTypes);
+            String confidence = remediationConfidence(primaryRule, priority, theme, finding);
+            DiagnosticReport.Location location = firstLocation(finding);
+            tasks.add(DiagnosticReport.RemediationTask.builder()
+                    .id(remediationTaskId(finding, primaryRule))
+                    .title(remediationTitle(finding, location, primaryRule))
+                    .priority(priority)
+                    .severity(finding.getSeverity())
+                    .theme(theme)
+                    .confidence(confidence)
+                    .location(location)
+                    .campaignId(campaignIdForTask(ruleTypes, theme))
+                    .ruleTypes(ruleTypes)
+                    .impact(remediationImpact(priority, theme))
+                    .repairRecipeId(repairRecipeId(primaryRule, finding))
+                    .recommendation(remediationRecommendation(primaryRule))
+                    .acceptanceCheck(remediationAcceptanceCheck(priority, primaryRule))
+                    .evidence(primaryIssue.getMessage())
+                    .sql(finding.getSql())
+                    .build());
+        }
+        return tasks;
+    }
+
+    private static int countTasksByConfidence(List<DiagnosticReport.RemediationTask> tasks, String confidence) {
+        int count = 0;
+        for (DiagnosticReport.RemediationTask task : tasks) {
+            if (confidence.equals(task.getConfidence())) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static String estimatedFirstPassFocus(List<DiagnosticReport.RemediationTask> tasks) {
+        if (tasks.isEmpty()) {
+            return "暂无修复任务。";
+        }
+        for (DiagnosticReport.RemediationTask task : tasks) {
+            if ("P0".equals(task.getPriority())) {
+                return "优先处理 P0 安全止血任务，完成后重新扫描。";
+            }
+        }
+        for (DiagnosticReport.RemediationTask task : tasks) {
+            if ("P1".equals(task.getPriority())) {
+                return "优先收敛 P1 无边界查询与索引风险。";
+            }
+        }
+        return "优先复核模板和低风险正确性任务。";
+    }
+
+    private static List<String> ruleTypes(DiagnosticReport.Finding finding) {
+        List<String> ruleTypes = new ArrayList<>();
+        for (DiagnosticReport.Issue issue : finding.getIssues()) {
+            String type = safe(issue.getType(), "UNKNOWN");
+            if (!ruleTypes.contains(type)) {
+                ruleTypes.add(type);
+            }
+        }
+        return ruleTypes;
+    }
+
+    private static String remediationPriority(List<String> ruleTypes, String severity) {
+        if (hasAnyRule(ruleTypes,
+                "SQL_INJECTION_RISK",
+                "DYNAMIC_SQL",
+                "DANGEROUS_DROP_TRUNCATE",
+                "DELETE_UPDATE_NO_WHERE")
+                || "CRITICAL".equals(severity)) {
+            return "P0";
+        }
+        if (hasAnyRule(ruleTypes,
+                "SELECT_WITHOUT_WHERE",
+                "ORDER_BY_WITHOUT_LIMIT",
+                "MISSING_INDEX",
+                "NO_INDEX_USED",
+                "FULL_TABLE_SCAN")) {
+            return "P1";
+        }
+        return "P2";
+    }
+
+    private static String remediationTheme(List<String> ruleTypes) {
+        if (hasAnyRule(ruleTypes,
+                "SQL_INJECTION_RISK",
+                "DYNAMIC_SQL",
+                "DANGEROUS_DROP_TRUNCATE",
+                "DELETE_UPDATE_NO_WHERE")) {
+            return "SAFETY";
+        }
+        if (hasAnyRule(ruleTypes,
+                "SELECT_WITHOUT_WHERE",
+                "ORDER_BY_WITHOUT_LIMIT",
+                "MISSING_INDEX",
+                "NO_INDEX_USED",
+                "FULL_TABLE_SCAN")) {
+            return "PERFORMANCE";
+        }
+        if (hasAnyRule(ruleTypes, "UNKNOWN", "SQL_SYNTAX_ERROR")) {
+            return "MAINTAINABILITY";
+        }
+        return "CORRECTNESS";
+    }
+
+    private static String remediationConfidence(
+            String primaryRule,
+            String priority,
+            String theme,
+            DiagnosticReport.Finding finding) {
+        boolean explainExecuted = finding.getExplain() != null && finding.getExplain().isExecuted();
+        if (matchesRule(primaryRule, "UNKNOWN", "SQL_SYNTAX_ERROR")) {
+            return "NEEDS_REVIEW";
+        }
+        if ("P0".equals(priority) && "SAFETY".equals(theme) && !explainExecuted) {
+            return "NEEDS_REVIEW";
+        }
+        if (explainExecuted) {
+            return "CONFIRMED";
+        }
+        return "LIKELY";
+    }
+
+    private static DiagnosticReport.Location firstLocation(DiagnosticReport.Finding finding) {
+        if (finding.getLocations() == null || finding.getLocations().isEmpty()) {
+            return null;
+        }
+        return finding.getLocations().get(0);
+    }
+
+    private static String remediationTaskId(DiagnosticReport.Finding finding, String primaryRule) {
+        return safe(finding.getId(), "sql") + "-remediation-" + normalizeRule(primaryRule).toLowerCase();
+    }
+
+    private static String remediationTitle(
+            DiagnosticReport.Finding finding,
+            DiagnosticReport.Location location,
+            String primaryRule) {
+        if (location != null) {
+            String fileName = safe(location.getFileName(), safe(location.getFilePath(), "Unknown"));
+            return fileName + ":" + location.getStartLine() + " · " + primaryRule;
+        }
+        return safe(finding.getSqlType(), "UNKNOWN") + " SQL · " + primaryRule;
+    }
+
+    private static String campaignIdForTask(List<String> ruleTypes, String theme) {
+        if ("SAFETY".equals(theme) && hasAnyRule(ruleTypes, "SQL_INJECTION_RISK", "DYNAMIC_SQL")) {
+            return "p0-dynamic-sql-safety";
+        }
+        if ("PERFORMANCE".equals(theme)) {
+            return "p1-unbounded-query-containment";
+        }
+        if ("MAINTAINABILITY".equals(theme) && hasAnyRule(ruleTypes, "UNKNOWN", "SQL_SYNTAX_ERROR")) {
+            return "p2-template-review";
+        }
+        return null;
+    }
+
+    private static String repairRecipeId(String primaryRule, DiagnosticReport.Finding finding) {
+        if (matchesRule(primaryRule, "SQL_INJECTION_RISK")) {
+            return "dynamic-value-binding";
+        }
+        if (matchesRule(primaryRule, "DYNAMIC_SQL")) {
+            return containsDynamicOrderBy(finding) ? "dynamic-order-by-whitelist" : "dynamic-value-binding";
+        }
+        if (matchesRule(primaryRule,
+                "SELECT_WITHOUT_WHERE",
+                "ORDER_BY_WITHOUT_LIMIT",
+                "MISSING_INDEX",
+                "NO_INDEX_USED",
+                "FULL_TABLE_SCAN")) {
+            return "unbounded-query-containment";
+        }
+        if (matchesRule(primaryRule, "SELECT_STAR")) {
+            return "select-star-field-list";
+        }
+        if (matchesRule(primaryRule, "DANGEROUS_DROP_TRUNCATE", "DELETE_UPDATE_NO_WHERE")) {
+            return "dangerous-dml-guardrail";
+        }
+        return "template-review-normalization";
+    }
+
+    private static boolean containsDynamicOrderBy(DiagnosticReport.Finding finding) {
+        DiagnosticReport.SqlText sql = finding.getSql();
+        String text = sql != null ? safe(sql.getOriginal(), safe(sql.getNormalized(), safe(sql.getAbstracted(), ""))) : "";
+        String normalized = text.toUpperCase();
+        return normalized.contains("ORDER BY") && text.contains("${");
+    }
+
+    private static String remediationRecommendation(String primaryRule) {
+        if (matchesRule(primaryRule, "SQL_INJECTION_RISK", "DYNAMIC_SQL")) {
+            return "把动态值改为参数绑定；动态列名、排序字段使用白名单映射。";
+        }
+        if (matchesRule(primaryRule,
+                "SELECT_WITHOUT_WHERE",
+                "ORDER_BY_WITHOUT_LIMIT",
+                "MISSING_INDEX",
+                "NO_INDEX_USED",
+                "FULL_TABLE_SCAN")) {
+            return "补充业务过滤、分页边界或索引，并用 EXPLAIN 验证扫描范围。";
+        }
+        if (matchesRule(primaryRule, "SELECT_STAR")) {
+            return "改为显式字段清单，只返回业务需要字段。";
+        }
+        if (matchesRule(primaryRule, "DANGEROUS_DROP_TRUNCATE", "DELETE_UPDATE_NO_WHERE")) {
+            return "为危险 DML 增加 WHERE、影响行数校验和审批保护。";
+        }
+        if (matchesRule(primaryRule, "UNKNOWN", "SQL_SYNTAX_ERROR")) {
+            return "先归一化模板或修正语法，再重新扫描归类。";
+        }
+        return "按规则建议完成最小化修复，并重新扫描确认。";
+    }
+
+    private static String remediationImpact(String priority, String theme) {
+        if ("P0".equals(priority) && "SAFETY".equals(theme)) {
+            return "可能导致 SQL 注入、越权读取或破坏性变更，需优先止血。";
+        }
+        if ("PERFORMANCE".equals(theme)) {
+            return "可能扩大扫描范围或排序成本，影响数据库稳定性。";
+        }
+        if ("MAINTAINABILITY".equals(theme)) {
+            return "模板或规则证据不足，需先复核以降低误报和漏报。";
+        }
+        return "可能导致查询结果或业务约束偏离预期。";
+    }
+
+    private static String remediationAcceptanceCheck(String priority, String primaryRule) {
+        if ("P0".equals(priority)) {
+            return "完成 P0 修复后重新扫描，确认 " + primaryRule + " 不再出现。";
+        }
+        if ("P1".equals(priority)) {
+            return "重新扫描并补充 EXPLAIN 证据，确认 " + primaryRule + " 风险下降。";
+        }
+        return "重新扫描并确认 " + primaryRule + " 已修复或完成人工复核记录。";
+    }
+
+    private static boolean hasAnyRule(List<String> ruleTypes, String... candidates) {
+        for (String ruleType : ruleTypes) {
+            if (matchesRule(ruleType, candidates)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesRule(String ruleType, String... candidates) {
+        String normalized = normalizeRule(ruleType);
+        for (String candidate : candidates) {
+            if (normalized.equals(normalizeRule(candidate))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String normalizeRule(String ruleType) {
+        return ruleType == null || ruleType.isBlank() ? "UNKNOWN" : ruleType.trim().toUpperCase();
+    }
+
+    private static List<DiagnosticReport.RepairRecipe> defaultRepairRecipes() {
+        return List.of(
+                repairRecipe(
+                        "dynamic-value-binding",
+                        "动态值改为参数绑定",
+                        List.of("SQL_INJECTION_RISK", "DYNAMIC_SQL"),
+                        "${value} 或字符串拼接直接进入 SQL",
+                        "#{value} / ? 参数绑定；动态标识符走白名单",
+                        List.of("定位动态片段来源。", "普通值改为参数绑定。", "列名、排序方向等标识符改为白名单映射。"),
+                        "重新扫描确认 SQL_INJECTION_RISK/DYNAMIC_SQL 消失，并补充动态分支测试。",
+                        List.of("表名、列名等标识符不能直接参数绑定，必须白名单。")),
+                repairRecipe(
+                        "dynamic-order-by-whitelist",
+                        "动态排序白名单",
+                        List.of("DYNAMIC_SQL", "SQL_INJECTION_RISK"),
+                        "ORDER BY ${orderBy}",
+                        "ORDER BY <mapped_column> <mapped_direction>",
+                        List.of("枚举允许排序字段。", "枚举 ASC/DESC。", "默认值落到安全排序。"),
+                        "重新扫描并覆盖非法排序字段回退分支。",
+                        List.of("排序字段来自业务枚举时仍需处理默认分支。")),
+                repairRecipe(
+                        "unbounded-query-containment",
+                        "无边界查询收敛",
+                        List.of("SELECT_WITHOUT_WHERE", "ORDER_BY_WITHOUT_LIMIT", "MISSING_INDEX", "NO_INDEX_USED", "FULL_TABLE_SCAN"),
+                        "缺少 WHERE/LIMIT 或无法命中索引",
+                        "业务过滤 + 分页边界 + 可验证索引路径",
+                        List.of("补充业务过滤条件。", "增加分页或 LIMIT 上限。", "用 EXPLAIN 验证访问路径和扫描行数。"),
+                        "重新扫描并记录 EXPLAIN 访问类型、索引和 rows 下降。",
+                        List.of("离线批处理全量读取需要显式说明业务边界。")),
+                repairRecipe(
+                        "select-star-field-list",
+                        "SELECT * 改为字段清单",
+                        List.of("SELECT_STAR"),
+                        "SELECT *",
+                        "SELECT id, status, updated_at",
+                        List.of("确认调用方实际读取字段。", "替换为稳定字段清单。", "回归序列化和映射结果。"),
+                        "重新扫描确认 SELECT_STAR 消失。",
+                        List.of("字段清单需随业务 DTO 演进同步维护。")),
+                repairRecipe(
+                        "dangerous-dml-guardrail",
+                        "危险 DML 防护",
+                        List.of("DANGEROUS_DROP_TRUNCATE", "DELETE_UPDATE_NO_WHERE"),
+                        "DROP/TRUNCATE 或无 WHERE UPDATE/DELETE",
+                        "审批保护 + WHERE 边界 + 影响行数校验",
+                        List.of("确认语句是否允许在线执行。", "补充 WHERE 或迁移审批保护。", "增加影响行数阈值和回滚预案。"),
+                        "重新扫描确认危险 DML 规则消失或完成审批记录。",
+                        List.of("结构变更类 SQL 可能需要迁移系统单独治理。")),
+                repairRecipe(
+                        "template-review-normalization",
+                        "模板归一化复核",
+                        List.of("UNKNOWN", "SQL_SYNTAX_ERROR"),
+                        "动态模板或方言语法无法稳定解析",
+                        "最小样例 + 模板归一化 + 明确规则归类",
+                        List.of("抽取最小 SQL 样例。", "修正模板占位符或数据库方言。", "重新扫描并归类到明确规则。"),
+                        "重新扫描确认 UNKNOWN/SQL_SYNTAX_ERROR 下降或已有人工复核结论。",
+                        List.of("复杂模板可能需要结合运行时参数人工确认。"))
+        );
+    }
+
+    private static DiagnosticReport.RepairRecipe repairRecipe(
+            String id,
+            String title,
+            List<String> appliesToRules,
+            String unsafePattern,
+            String safePattern,
+            List<String> steps,
+            String verification,
+            List<String> knownLimits) {
+        return DiagnosticReport.RepairRecipe.builder()
+                .id(id)
+                .title(title)
+                .appliesToRules(appliesToRules)
+                .unsafePattern(unsafePattern)
+                .safePattern(safePattern)
+                .steps(steps)
+                .verification(verification)
+                .knownLimits(knownLimits)
+                .build();
     }
 
     private static DiagnosticReport.RemediationCampaign campaignForRule(
