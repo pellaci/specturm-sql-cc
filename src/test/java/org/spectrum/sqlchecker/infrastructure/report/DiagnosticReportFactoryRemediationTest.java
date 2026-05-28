@@ -2,6 +2,8 @@ package org.spectrum.sqlchecker.infrastructure.report;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.spectrum.sqlchecker.application.analysis.dto.ExplainAnalysisDto;
+import org.spectrum.sqlchecker.application.analysis.dto.ExplainIssue;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticAnalysisDto;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticIssue;
 import org.spectrum.sqlchecker.application.report.dto.DiagnosticReport;
@@ -121,6 +123,32 @@ class DiagnosticReportFactoryRemediationTest {
     }
 
     @Test
+    @DisplayName("should keep future dangerous DML remediation task likely without EXPLAIN evidence")
+    void should_keep_future_dangerous_dml_remediation_task_likely_without_explain_evidence() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-trade")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(deleteWithoutWhereSql()))
+                .build());
+
+        assertThat(report.getRemediation().getSummary().getTaskCount()).isEqualTo(1);
+        assertThat(report.getRemediation().getSummary().getLikelyTaskCount()).isEqualTo(1);
+        assertThat(report.getRemediation().getSummary().getReviewTaskCount()).isZero();
+        assertThat(report.getRemediation().getTasks())
+                .singleElement()
+                .satisfies(task -> {
+                    assertThat(task.getTitle()).isEqualTo("OrderMapper.xml:99 · DELETE_UPDATE_NO_WHERE");
+                    assertThat(task.getPriority()).isEqualTo("P0");
+                    assertThat(task.getTheme()).isEqualTo("SAFETY");
+                    assertThat(task.getConfidence()).isEqualTo("LIKELY");
+                    assertThat(task.getRepairRecipeId()).isEqualTo("dangerous-dml-guardrail");
+                });
+    }
+
+    @Test
     @DisplayName("should expose initial repair recipes")
     void should_expose_initial_repair_recipes() {
         DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
@@ -184,6 +212,32 @@ class DiagnosticReportFactoryRemediationTest {
                                 .severity(SeverityLevel.WARNING)
                                 .message("SELECT 缺少 WHERE 条件")
                                 .suggestion("补充业务过滤条件或分页限制")
+                                .build()))
+                        .build())
+                .build();
+    }
+
+    private static SqlStatementDto deleteWithoutWhereSql() {
+        return SqlStatementDto.builder()
+                .id("sql-delete-no-where")
+                .sqlType(SqlType.DELETE)
+                .originalSql("DELETE FROM orders")
+                .normalizedSql("DELETE FROM orders")
+                .abstractSql("DELETE FROM orders")
+                .validity(ValidityStatus.VALID)
+                .explainEligibility(ExplainEligibility.SKIPPED)
+                .severity(SeverityLevel.CRITICAL)
+                .score(40)
+                .locations(List.of(location("OrderMapper.xml", 99)))
+                .explainAnalysis(ExplainAnalysisDto.builder()
+                        .sqlId("sql-delete-no-where")
+                        .severity(SeverityLevel.CRITICAL)
+                        .issues(List.of(ExplainIssue.builder()
+                                .type("DELETE_UPDATE_NO_WHERE")
+                                .severity(SeverityLevel.CRITICAL)
+                                .message("DELETE 缺少 WHERE 条件")
+                                .suggestion("补充 WHERE 条件和影响行数保护")
+                                .tableName("orders")
                                 .build()))
                         .build())
                 .build();

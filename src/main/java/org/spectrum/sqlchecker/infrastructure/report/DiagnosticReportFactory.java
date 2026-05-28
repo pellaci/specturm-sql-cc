@@ -210,7 +210,7 @@ public final class DiagnosticReportFactory {
             List<String> ruleTypes = ruleTypes(finding);
             String priority = remediationPriority(ruleTypes, finding.getSeverity());
             String theme = remediationTheme(ruleTypes);
-            String confidence = remediationConfidence(primaryRule, priority, theme, finding);
+            String confidence = remediationConfidence(primaryRule, finding);
             DiagnosticReport.Location location = firstLocation(finding);
             tasks.add(DiagnosticReport.RemediationTask.builder()
                     .id(remediationTaskId(finding, primaryRule))
@@ -313,16 +313,13 @@ public final class DiagnosticReportFactory {
         return "CORRECTNESS";
     }
 
-    private static String remediationConfidence(
-            String primaryRule,
-            String priority,
-            String theme,
-            DiagnosticReport.Finding finding) {
+    private static String remediationConfidence(String primaryRule, DiagnosticReport.Finding finding) {
         boolean explainExecuted = finding.getExplain() != null && finding.getExplain().isExecuted();
-        if (matchesRule(primaryRule, "UNKNOWN", "SQL_SYNTAX_ERROR")) {
-            return "NEEDS_REVIEW";
-        }
-        if ("P0".equals(priority) && "SAFETY".equals(theme) && !explainExecuted) {
+        if (!explainExecuted && matchesRule(primaryRule,
+                "UNKNOWN",
+                "SQL_SYNTAX_ERROR",
+                "SQL_INJECTION_RISK",
+                "DYNAMIC_SQL")) {
             return "NEEDS_REVIEW";
         }
         if (explainExecuted) {
