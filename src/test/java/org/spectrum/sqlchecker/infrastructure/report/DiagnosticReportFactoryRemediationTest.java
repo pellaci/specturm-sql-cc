@@ -197,6 +197,27 @@ class DiagnosticReportFactoryRemediationTest {
     }
 
     @Test
+    @DisplayName("should prefer known unmapped rule over unknown for remediation recipe")
+    void should_prefer_known_unmapped_rule_over_unknown_for_remediation_recipe() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-trade")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(leadingWildcardWithUnknownSql()))
+                .build());
+
+        assertThat(report.getRemediation().getTasks())
+                .singleElement()
+                .satisfies(task -> {
+                    assertThat(task.getTitle()).isEqualTo("OrderMapper.xml:150 · LIKE_LEADING_WILDCARD");
+                    assertThat(task.getRepairRecipeId()).isEqualTo("general-rule-remediation");
+                    assertThat(task.getRepairRecipeId()).isNotEqualTo("template-review-normalization");
+                });
+    }
+
+    @Test
     @DisplayName("should expose initial repair recipes")
     void should_expose_initial_repair_recipes() {
         DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
@@ -341,6 +362,36 @@ class DiagnosticReportFactoryRemediationTest {
                                 .message("LIKE 使用前置通配符")
                                 .suggestion("改用后缀匹配或搜索索引")
                                 .build()))
+                        .build())
+                .build();
+    }
+
+    private static SqlStatementDto leadingWildcardWithUnknownSql() {
+        return SqlStatementDto.builder()
+                .id("sql-leading-wildcard-unknown")
+                .sqlType(SqlType.SELECT)
+                .originalSql("SELECT id FROM orders WHERE customer_name LIKE '%alice'")
+                .normalizedSql("SELECT id FROM orders WHERE customer_name LIKE ?")
+                .abstractSql("SELECT id FROM orders WHERE customer_name LIKE ?")
+                .validity(ValidityStatus.VALID)
+                .explainEligibility(ExplainEligibility.SKIPPED)
+                .severity(SeverityLevel.WARNING)
+                .score(75)
+                .locations(List.of(location("OrderMapper.xml", 150)))
+                .staticAnalysis(StaticAnalysisDto.builder()
+                        .issues(List.of(
+                                StaticIssue.builder()
+                                        .type(IssueType.LIKE_LEADING_WILDCARD)
+                                        .severity(SeverityLevel.WARNING)
+                                        .message("LIKE 使用前置通配符")
+                                        .suggestion("改用后缀匹配或搜索索引")
+                                        .build(),
+                                StaticIssue.builder()
+                                        .type(IssueType.UNKNOWN)
+                                        .severity(SeverityLevel.WARNING)
+                                        .message("未知规则待复核")
+                                        .suggestion("确认规则来源")
+                                        .build()))
                         .build())
                 .build();
     }

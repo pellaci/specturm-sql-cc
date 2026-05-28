@@ -259,8 +259,16 @@ public final class DiagnosticReportFactory {
             case "NO_INDEX_USED" -> 7;
             case "MISSING_INDEX" -> 8;
             case "SELECT_STAR" -> 9;
-            case "UNKNOWN" -> 10;
-            case "SQL_SYNTAX_ERROR" -> 11;
+            case "LIKE_LEADING_WILDCARD" -> 10;
+            case "CROSS_JOIN" -> 11;
+            case "SUBQUERY_IN_SELECT" -> 12;
+            case "UNCORRELATED_SUBQUERY" -> 13;
+            case "POTENTIAL_N_PLUS_ONE" -> 14;
+            case "SUSPICIOUS_JOIN_ORDER" -> 15;
+            case "TOO_MANY_JOINS" -> 16;
+            case "IMPLICIT_TYPE_CONVERSION" -> 17;
+            case "UNKNOWN" -> 90;
+            case "SQL_SYNTAX_ERROR" -> 91;
             default -> 100;
         };
     }
