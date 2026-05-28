@@ -61,13 +61,14 @@ class DiagnosticReportFactoryRemediationTest {
         assertThat(remediation.getTasks()).isEmpty();
         assertThat(remediation.getRecipes())
                 .extracting(DiagnosticReport.RepairRecipe::getId)
-                .containsExactly(
+                .contains(
                         "dynamic-value-binding",
                         "dynamic-order-by-whitelist",
                         "unbounded-query-containment",
                         "select-star-field-list",
                         "dangerous-dml-guardrail",
-                        "template-review-normalization");
+                        "template-review-normalization",
+                        "general-rule-remediation");
     }
 
     @Test
@@ -149,6 +150,53 @@ class DiagnosticReportFactoryRemediationTest {
     }
 
     @Test
+    @DisplayName("should choose canonical primary issue for multi-issue remediation tasks")
+    void should_choose_canonical_primary_issue_for_multi_issue_remediation_tasks() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-trade")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(injectionSecondSql()))
+                .build());
+
+        assertThat(report.getRemediation().getSummary().getTaskCount()).isEqualTo(1);
+        assertThat(report.getRemediation().getSummary().getReviewTaskCount()).isEqualTo(1);
+        assertThat(report.getRemediation().getTasks())
+                .singleElement()
+                .satisfies(task -> {
+                    assertThat(task.getTitle()).isEqualTo("OrderMapper.xml:120 · SQL_INJECTION_RISK");
+                    assertThat(task.getPriority()).isEqualTo("P0");
+                    assertThat(task.getRepairRecipeId()).isEqualTo("dynamic-value-binding");
+                    assertThat(task.getRecommendation()).contains("参数绑定").contains("白名单");
+                    assertThat(task.getConfidence()).isEqualTo("NEEDS_REVIEW");
+                    assertThat(task.getEvidence()).isEqualTo("动态 SQL 存在注入风险");
+                });
+    }
+
+    @Test
+    @DisplayName("should use general recipe for known unmapped rules")
+    void should_use_general_recipe_for_known_unmapped_rules() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-trade")
+                .totalFiles(1)
+                .filesScanned(1)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .sqlStatements(List.of(leadingWildcardSql()))
+                .build());
+
+        assertThat(report.getRemediation().getTasks())
+                .singleElement()
+                .satisfies(task -> {
+                    assertThat(task.getTitle()).isEqualTo("OrderMapper.xml:140 · LIKE_LEADING_WILDCARD");
+                    assertThat(task.getRepairRecipeId()).isEqualTo("general-rule-remediation");
+                    assertThat(task.getRepairRecipeId()).isNotEqualTo("template-review-normalization");
+                });
+    }
+
+    @Test
     @DisplayName("should expose initial repair recipes")
     void should_expose_initial_repair_recipes() {
         DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
@@ -168,7 +216,8 @@ class DiagnosticReportFactoryRemediationTest {
                         "unbounded-query-containment",
                         "select-star-field-list",
                         "dangerous-dml-guardrail",
-                        "template-review-normalization");
+                        "template-review-normalization",
+                        "general-rule-remediation");
     }
 
     private static SqlStatementDto dynamicSql() {
@@ -238,6 +287,59 @@ class DiagnosticReportFactoryRemediationTest {
                                 .message("DELETE 缺少 WHERE 条件")
                                 .suggestion("补充 WHERE 条件和影响行数保护")
                                 .tableName("orders")
+                                .build()))
+                        .build())
+                .build();
+    }
+
+    private static SqlStatementDto injectionSecondSql() {
+        return SqlStatementDto.builder()
+                .id("sql-multi-issue")
+                .sqlType(SqlType.SELECT)
+                .originalSql("SELECT id FROM orders WHERE status = ${status}")
+                .normalizedSql("SELECT id FROM orders WHERE status = ${status}")
+                .abstractSql("SELECT id FROM orders WHERE status = ${status}")
+                .validity(ValidityStatus.VALID)
+                .explainEligibility(ExplainEligibility.SKIPPED)
+                .severity(SeverityLevel.CRITICAL)
+                .score(45)
+                .locations(List.of(location("OrderMapper.xml", 120)))
+                .staticAnalysis(StaticAnalysisDto.builder()
+                        .issues(List.of(
+                                StaticIssue.builder()
+                                        .type(IssueType.SELECT_WITHOUT_WHERE)
+                                        .severity(SeverityLevel.WARNING)
+                                        .message("SELECT 缺少 WHERE 条件")
+                                        .suggestion("补充业务过滤条件或分页限制")
+                                        .build(),
+                                StaticIssue.builder()
+                                        .type(IssueType.SQL_INJECTION_RISK)
+                                        .severity(SeverityLevel.CRITICAL)
+                                        .message("动态 SQL 存在注入风险")
+                                        .suggestion("使用参数绑定或白名单")
+                                        .build()))
+                        .build())
+                .build();
+    }
+
+    private static SqlStatementDto leadingWildcardSql() {
+        return SqlStatementDto.builder()
+                .id("sql-leading-wildcard")
+                .sqlType(SqlType.SELECT)
+                .originalSql("SELECT id FROM orders WHERE customer_name LIKE '%alice'")
+                .normalizedSql("SELECT id FROM orders WHERE customer_name LIKE ?")
+                .abstractSql("SELECT id FROM orders WHERE customer_name LIKE ?")
+                .validity(ValidityStatus.VALID)
+                .explainEligibility(ExplainEligibility.SKIPPED)
+                .severity(SeverityLevel.WARNING)
+                .score(75)
+                .locations(List.of(location("OrderMapper.xml", 140)))
+                .staticAnalysis(StaticAnalysisDto.builder()
+                        .issues(List.of(StaticIssue.builder()
+                                .type(IssueType.LIKE_LEADING_WILDCARD)
+                                .severity(SeverityLevel.WARNING)
+                                .message("LIKE 使用前置通配符")
+                                .suggestion("改用后缀匹配或搜索索引")
                                 .build()))
                         .build())
                 .build();

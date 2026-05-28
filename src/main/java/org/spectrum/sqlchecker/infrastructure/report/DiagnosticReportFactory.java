@@ -205,7 +205,7 @@ public final class DiagnosticReportFactory {
             if (finding.getIssues() == null || finding.getIssues().isEmpty()) {
                 continue;
             }
-            DiagnosticReport.Issue primaryIssue = finding.getIssues().get(0);
+            DiagnosticReport.Issue primaryIssue = primaryIssue(finding);
             String primaryRule = safe(primaryIssue.getType(), "UNKNOWN");
             List<String> ruleTypes = ruleTypes(finding);
             String priority = remediationPriority(ruleTypes, finding.getSeverity());
@@ -231,6 +231,38 @@ public final class DiagnosticReportFactory {
                     .build());
         }
         return tasks;
+    }
+
+    private static DiagnosticReport.Issue primaryIssue(DiagnosticReport.Finding finding) {
+        DiagnosticReport.Issue primary = finding.getIssues().get(0);
+        int primaryRank = ruleRank(primary.getType());
+        for (int i = 1; i < finding.getIssues().size(); i++) {
+            DiagnosticReport.Issue candidate = finding.getIssues().get(i);
+            int candidateRank = ruleRank(candidate.getType());
+            if (candidateRank < primaryRank) {
+                primary = candidate;
+                primaryRank = candidateRank;
+            }
+        }
+        return primary;
+    }
+
+    private static int ruleRank(String ruleType) {
+        return switch (normalizeRule(ruleType)) {
+            case "SQL_INJECTION_RISK" -> 0;
+            case "DYNAMIC_SQL" -> 1;
+            case "DANGEROUS_DROP_TRUNCATE" -> 2;
+            case "DELETE_UPDATE_NO_WHERE" -> 3;
+            case "SELECT_WITHOUT_WHERE" -> 4;
+            case "ORDER_BY_WITHOUT_LIMIT" -> 5;
+            case "FULL_TABLE_SCAN" -> 6;
+            case "NO_INDEX_USED" -> 7;
+            case "MISSING_INDEX" -> 8;
+            case "SELECT_STAR" -> 9;
+            case "UNKNOWN" -> 10;
+            case "SQL_SYNTAX_ERROR" -> 11;
+            default -> 100;
+        };
     }
 
     private static int countTasksByConfidence(List<DiagnosticReport.RemediationTask> tasks, String confidence) {
@@ -384,7 +416,10 @@ public final class DiagnosticReportFactory {
         if (matchesRule(primaryRule, "DANGEROUS_DROP_TRUNCATE", "DELETE_UPDATE_NO_WHERE")) {
             return "dangerous-dml-guardrail";
         }
-        return "template-review-normalization";
+        if (matchesRule(primaryRule, "UNKNOWN", "SQL_SYNTAX_ERROR")) {
+            return "template-review-normalization";
+        }
+        return "general-rule-remediation";
     }
 
     private static boolean containsDynamicOrderBy(DiagnosticReport.Finding finding) {
@@ -519,7 +554,16 @@ public final class DiagnosticReportFactory {
                         "最小样例 + 模板归一化 + 明确规则归类",
                         List.of("抽取最小 SQL 样例。", "修正模板占位符或数据库方言。", "重新扫描并归类到明确规则。"),
                         "重新扫描确认 UNKNOWN/SQL_SYNTAX_ERROR 下降或已有人工复核结论。",
-                        List.of("复杂模板可能需要结合运行时参数人工确认。"))
+                        List.of("复杂模板可能需要结合运行时参数人工确认。")),
+                repairRecipe(
+                        "general-rule-remediation",
+                        "通用规则修复",
+                        List.of("KNOWN_RULE"),
+                        "已识别规则暂无专用修复模板",
+                        "按规则建议做最小化修复并保留验证证据",
+                        List.of("确认规则消息和 SQL 位置。", "按规则建议完成最小化修改。", "重新扫描确认该规则不再触发。"),
+                        "重新扫描确认规则消失，必要时补充 SQL 单元或集成测试。",
+                        List.of("复杂 SQL 可能需要结合业务语义决定最终改写方式。"))
         );
     }
 
