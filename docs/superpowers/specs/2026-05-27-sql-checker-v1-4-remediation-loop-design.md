@@ -321,4 +321,3 @@ v1.4 is releasable when:
 - IDE-friendly task export.
 - Rule suppression with rationale.
 - Owner/module mapping.
-
