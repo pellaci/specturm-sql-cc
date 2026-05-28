@@ -22,7 +22,10 @@ import org.spectrum.sqlchecker.domain.shared.exception.ScanException;
 import org.spectrum.sqlchecker.infrastructure.report.FallbackReportRenderer;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.lang.reflect.Field;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,7 +76,15 @@ class ScanCommandTest {
         setField(command, "scanOrchestrator", orchestrator);
         setField(command, "fallbackReportRenderer", new FallbackReportRenderer());
 
-        Integer exitCode = command.call();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        Integer exitCode;
+        try {
+            System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+            exitCode = command.call();
+        } finally {
+            System.setOut(originalOut);
+        }
         File reportFile = new File(outputPath);
         File jsonFile = tempDir.resolve("report.json").toFile();
 
@@ -81,6 +92,8 @@ class ScanCommandTest {
         assertThat(reportFile).exists();
         assertThat(jsonFile).exists();
         assertThat(reportFile.length()).isGreaterThan(0);
+        assertThat(stdout.toString(StandardCharsets.UTF_8))
+                .contains("Remediation tasks: 0 (P0 0 / P1 0 / P2 0)");
     }
 
     @Test

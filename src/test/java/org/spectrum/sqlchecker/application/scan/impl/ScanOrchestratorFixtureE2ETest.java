@@ -74,6 +74,10 @@ class ScanOrchestratorFixtureE2ETest {
         assertThat(json).contains("\"campaigns\"");
         assertThat(json).contains("\"confidence\"");
         assertThat(json).contains("\"methodology\"");
+        assertThat(json).contains("\"remediation\"");
+        assertThat(json).contains("\"tasks\"");
+        assertThat(json).contains("\"recipes\"");
+        assertThat(json).contains("\"taskCount\"");
         assertThat(json).contains("p0-dynamic-sql-safety");
     }
 

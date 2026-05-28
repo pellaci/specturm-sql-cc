@@ -369,6 +369,9 @@ class ReportServiceImplTest {
         assertThat(html).contains("data-copy-sql");
         assertThat(html).contains("window.navigator && navigator.clipboard");
         assertThat(html).contains("navigator.clipboard.writeText");
+        assertThat(html).contains("function selectTextFallback(text)");
+        assertThat(html).contains("document.createElement('textarea')");
+        assertThat(html).contains("textarea.select()");
     }
 
     @Test
