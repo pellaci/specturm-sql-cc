@@ -1155,6 +1155,23 @@
                 }
             }
 
+            function selectTextFallback(text) {
+                var textarea = document.createElement('textarea');
+                textarea.value = text || '';
+                textarea.setAttribute('readonly', 'readonly');
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                setTimeout(function () {
+                    if (textarea.parentNode) {
+                        textarea.parentNode.removeChild(textarea);
+                    }
+                }, 1200);
+            }
+
             function copyText(text, button, fallbackNode) {
                 if (!text || !button) {
                     return;
@@ -1164,10 +1181,18 @@
                     navigator.clipboard.writeText(text).then(function () {
                         markCopied(button, original);
                     }).catch(function () {
-                        selectNode(fallbackNode);
+                        if (fallbackNode) {
+                            selectNode(fallbackNode);
+                        } else {
+                            selectTextFallback(text);
+                        }
                     });
                 } else {
-                    selectNode(fallbackNode);
+                    if (fallbackNode) {
+                        selectNode(fallbackNode);
+                    } else {
+                        selectTextFallback(text);
+                    }
                 }
             }
 
