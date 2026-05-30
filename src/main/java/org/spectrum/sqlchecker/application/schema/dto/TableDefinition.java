@@ -24,6 +24,21 @@ public class TableDefinition {
     private String originalDdl;
 
     /**
+     * DDL 中声明的列
+     */
+    private java.util.List<String> columns;
+
+    /**
+     * 主键列
+     */
+    private java.util.List<String> primaryKeyColumns;
+
+    /**
+     * 索引覆盖列（包含主键和普通索引首列/成员列）
+     */
+    private java.util.List<String> indexedColumns;
+
+    /**
      * 是否是推断的（非 DDL 文件提取）
      */
     private boolean inferred;

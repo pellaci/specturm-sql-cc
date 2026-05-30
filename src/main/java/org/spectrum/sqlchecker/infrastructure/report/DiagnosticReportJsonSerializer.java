@@ -20,6 +20,7 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldObject(sb, first, "summary", safeReport.getSummary(), DiagnosticReportJsonSerializer::appendSummary);
         first = fieldObject(sb, first, "hotspots", safeReport.getHotspots(), DiagnosticReportJsonSerializer::appendHotspots);
         first = fieldObject(sb, first, "insights", safeReport.getInsights(), DiagnosticReportJsonSerializer::appendInsights);
+        first = fieldObject(sb, first, "schemaAnalysis", safeReport.getSchemaAnalysis(), DiagnosticReportJsonSerializer::appendSchemaAnalysis);
         first = fieldList(sb, first, "findings", safeReport.getFindings(), DiagnosticReportJsonSerializer::appendFinding);
         first = fieldObject(sb, first, "diagnostics", safeReport.getDiagnostics(), DiagnosticReportJsonSerializer::appendDiagnostics);
         first = fieldObject(sb, first, "executiveSummary", safeReport.getExecutiveSummary(), DiagnosticReportJsonSerializer::appendExecutiveSummary);
@@ -107,6 +108,48 @@ public final class DiagnosticReportJsonSerializer {
         first = fieldString(sb, first, "severity", item.getSeverity());
         first = fieldString(sb, first, "evidence", item.getEvidence());
         fieldStringList(sb, first, "locations", item.getLocations());
+        endObject(sb);
+    }
+
+    private static void appendSchemaAnalysis(StringBuilder sb, DiagnosticReport.SchemaAnalysis schemaAnalysis) {
+        boolean first = beginObject(sb);
+        first = fieldBoolean(sb, first, "ddlDetected", schemaAnalysis.isDdlDetected());
+        first = fieldNumber(sb, first, "ddlFileCount", schemaAnalysis.getDdlFileCount());
+        first = fieldNumber(sb, first, "tableCount", schemaAnalysis.getTableCount());
+        first = fieldNumber(sb, first, "referencedTableCount", schemaAnalysis.getReferencedTableCount());
+        first = fieldNumber(sb, first, "coveredTableCount", schemaAnalysis.getCoveredTableCount());
+        first = fieldNumber(sb, first, "missingDdlTableCount", schemaAnalysis.getMissingDdlTableCount());
+        first = fieldNumber(sb, first, "unindexedPredicateCount", schemaAnalysis.getUnindexedPredicateCount());
+        first = fieldList(sb, first, "tables", schemaAnalysis.getTables(), DiagnosticReportJsonSerializer::appendSchemaTable);
+        first = fieldList(sb, first, "risks", schemaAnalysis.getRisks(), DiagnosticReportJsonSerializer::appendSchemaRisk);
+        fieldStringList(sb, first, "warnings", schemaAnalysis.getWarnings());
+        endObject(sb);
+    }
+
+    private static void appendSchemaTable(StringBuilder sb, DiagnosticReport.SchemaTable table) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "tableName", table.getTableName());
+        first = fieldString(sb, first, "sourceFile", table.getSourceFile());
+        first = fieldStringList(sb, first, "columns", table.getColumns());
+        first = fieldStringList(sb, first, "primaryKeyColumns", table.getPrimaryKeyColumns());
+        first = fieldStringList(sb, first, "indexedColumns", table.getIndexedColumns());
+        first = fieldNumber(sb, first, "referencedSqlCount", table.getReferencedSqlCount());
+        fieldString(sb, first, "coverage", table.getCoverage());
+        endObject(sb);
+    }
+
+    private static void appendSchemaRisk(StringBuilder sb, DiagnosticReport.SchemaRisk risk) {
+        boolean first = beginObject(sb);
+        first = fieldString(sb, first, "sqlId", risk.getSqlId());
+        first = fieldString(sb, first, "riskType", risk.getRiskType());
+        first = fieldString(sb, first, "severity", risk.getSeverity());
+        first = fieldString(sb, first, "tableName", risk.getTableName());
+        first = fieldStringList(sb, first, "predicateColumns", risk.getPredicateColumns());
+        first = fieldStringList(sb, first, "indexedPredicateColumns", risk.getIndexedPredicateColumns());
+        first = fieldStringList(sb, first, "missingIndexColumns", risk.getMissingIndexColumns());
+        first = fieldStringList(sb, first, "locations", risk.getLocations());
+        first = fieldString(sb, first, "evidence", risk.getEvidence());
+        fieldString(sb, first, "recommendation", risk.getRecommendation());
         endObject(sb);
     }
 

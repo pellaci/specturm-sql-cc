@@ -11,6 +11,7 @@ import org.spectrum.sqlchecker.application.analysis.dto.ExplainAnalysisDto;
 import org.spectrum.sqlchecker.application.analysis.dto.ExplainIssue;
 import org.spectrum.sqlchecker.application.analysis.dto.ExplainPlan;
 import org.spectrum.sqlchecker.application.report.dto.ReportSummary;
+import org.spectrum.sqlchecker.application.scan.dto.SchemaAnalysisDto;
 import org.spectrum.sqlchecker.application.scan.dto.SqlLocationDto;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
 import org.spectrum.sqlchecker.application.scan.dto.SqlStatementDto;
@@ -146,6 +147,7 @@ class ReportServiceImplTest {
         assertThat(json).contains("\"summary\"");
         assertThat(json).contains("\"hotspots\"");
         assertThat(json).contains("\"findings\"");
+        assertThat(json).contains("\"schemaAnalysis\"");
         assertThat(json).contains("\"diagnostics\"");
         assertThat(json).contains("\"executiveSummary\"");
         assertThat(json).contains("\"campaigns\"");
@@ -181,6 +183,28 @@ class ReportServiceImplTest {
         assertThat(json).contains("\"warningIssues\":1");
         assertThat(json).contains("\"infoIssues\":0");
         assertThat(json).contains("SELECT_STAR");
+    }
+
+    @Test
+    @DisplayName("should expose DDL association in diagnostic json and html")
+    void should_expose_ddl_association_in_diagnostic_json_and_html(@org.junit.jupiter.api.io.TempDir Path tempDir) throws Exception {
+        org.spectrum.sqlchecker.infrastructure.report.impl.ReportServiceImpl service =
+                new org.spectrum.sqlchecker.infrastructure.report.impl.ReportServiceImpl(new TemplateEngine());
+        Path jsonOutput = tempDir.resolve("schema-report.json");
+        Path htmlOutput = tempDir.resolve("schema-report.html");
+        ScanResult scanResult = createSchemaLinkedScanResult();
+
+        service.generateJsonReport(scanResult, jsonOutput.toString());
+        service.generateHtmlReport(scanResult, htmlOutput.toString());
+
+        String json = Files.readString(jsonOutput);
+        String html = Files.readString(htmlOutput);
+        assertThat(json).contains("\"ddlDetected\":true");
+        assertThat(json).contains("\"riskType\":\"UNINDEXED_PREDICATE\"");
+        assertThat(json).contains("\"missingIndexColumns\":[\"status\"]");
+        assertThat(html).contains("DDL 关联风险分析");
+        assertThat(html).contains("t_order · UNINDEXED_PREDICATE");
+        assertThat(html).contains("疑似未索引谓词");
     }
 
     @Test
@@ -1014,6 +1038,67 @@ class ReportServiceImplTest {
                 .sqlFound(1)
                 .uniqueSqlFound(1)
                 .durationMs(42)
+                .sqlStatements(List.of(sql))
+                .errors(new ArrayList<>())
+                .build();
+    }
+
+    private ScanResult createSchemaLinkedScanResult() {
+        SqlStatementDto sql = SqlStatementDto.builder()
+                .id("sql-schema-risk")
+                .sqlType(SqlType.SELECT)
+                .originalSql("SELECT id FROM t_order WHERE status = ?")
+                .abstractSql("SELECT id FROM t_order WHERE status = ?")
+                .normalizedSql("SELECT id FROM t_order WHERE status = ?")
+                .validity(ValidityStatus.VALID)
+                .explainEligibility(ExplainEligibility.SKIPPED)
+                .severity(SeverityLevel.WARNING)
+                .score(85)
+                .locations(List.of(location("mapper/OrderMapper.xml")))
+                .build();
+
+        SchemaAnalysisDto schemaAnalysis = SchemaAnalysisDto.builder()
+                .ddlDetected(true)
+                .ddlFileCount(1)
+                .tableCount(1)
+                .referencedTableCount(1)
+                .coveredTableCount(1)
+                .missingDdlTableCount(0)
+                .unindexedPredicateCount(1)
+                .tables(List.of(SchemaAnalysisDto.TableSummary.builder()
+                        .tableName("t_order")
+                        .sourceFile("schema.sql")
+                        .columns(List.of("id", "status"))
+                        .primaryKeyColumns(List.of("id"))
+                        .indexedColumns(List.of("id"))
+                        .referencedSqlCount(1)
+                        .coverage("REFERENCED")
+                        .build()))
+                .risks(List.of(SchemaAnalysisDto.SqlSchemaRisk.builder()
+                        .sqlId("sql-schema-risk")
+                        .riskType("UNINDEXED_PREDICATE")
+                        .severity("WARNING")
+                        .tableName("t_order")
+                        .predicateColumns(List.of("status"))
+                        .indexedPredicateColumns(List.of())
+                        .missingIndexColumns(List.of("status"))
+                        .locations(List.of("mapper/OrderMapper.xml:12"))
+                        .evidence("过滤字段未在 DDL 索引列中命中: status")
+                        .recommendation("结合访问频次和表规模评估索引。")
+                        .build()))
+                .warnings(List.of())
+                .build();
+
+        return ScanResult.builder()
+                .scanId("scan-schema")
+                .status(ScanStatus.COMPLETED)
+                .scanPath("/tmp/project")
+                .totalFiles(2)
+                .filesScanned(2)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .durationMs(12)
+                .schemaAnalysis(schemaAnalysis)
                 .sqlStatements(List.of(sql))
                 .errors(new ArrayList<>())
                 .build();

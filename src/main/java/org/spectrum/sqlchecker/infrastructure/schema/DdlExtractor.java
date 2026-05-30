@@ -5,7 +5,10 @@ import org.spectrum.sqlchecker.application.schema.dto.TableDefinition;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,10 +71,16 @@ public class DdlExtractor {
             if (tableName != null && !tableName.isEmpty()) {
                 // 确保使用 IF NOT EXISTS
                 String safeDdl = ensureIfNotExists(ddl);
+                List<String> columns = extractColumns(ddl);
+                List<String> primaryKeyColumns = extractPrimaryKeyColumns(ddl);
+                List<String> indexedColumns = extractIndexedColumns(ddl, primaryKeyColumns);
 
                 tables.add(TableDefinition.builder()
                         .tableName(tableName)
                         .originalDdl(safeDdl)
+                        .columns(columns)
+                        .primaryKeyColumns(primaryKeyColumns)
+                        .indexedColumns(indexedColumns)
                         .inferred(false)
                         .sourceFile(sourceFile)
                         .build());
@@ -81,6 +90,118 @@ public class DdlExtractor {
         }
 
         return tables;
+    }
+
+    private List<String> extractColumns(String ddl) {
+        Set<String> columns = new LinkedHashSet<>();
+        for (String part : splitTopLevelDefinitions(extractDefinitionBody(ddl))) {
+            String definition = part.trim();
+            if (definition.isBlank() || isTableConstraint(definition)) {
+                continue;
+            }
+            Matcher matcher = Pattern.compile("^`?([\\w]+)`?\\s+.+", Pattern.CASE_INSENSITIVE | Pattern.DOTALL)
+                    .matcher(definition);
+            if (matcher.find()) {
+                columns.add(matcher.group(1));
+            }
+        }
+        return new ArrayList<>(columns);
+    }
+
+    private List<String> extractPrimaryKeyColumns(String ddl) {
+        Matcher matcher = Pattern.compile("PRIMARY\\s+KEY\\s*\\(([^)]+)\\)", Pattern.CASE_INSENSITIVE)
+                .matcher(ddl);
+        if (!matcher.find()) {
+            return List.of();
+        }
+        return parseColumnList(matcher.group(1));
+    }
+
+    private List<String> extractIndexedColumns(String ddl, List<String> primaryKeyColumns) {
+        Set<String> indexedColumns = new LinkedHashSet<>(primaryKeyColumns != null ? primaryKeyColumns : List.of());
+        Matcher inlineIndexMatcher = Pattern.compile(
+                        "(?:UNIQUE\\s+|FULLTEXT\\s+|SPATIAL\\s+)?(?:KEY|INDEX)\\s+`?[\\w]+`?\\s*\\(([^)]+)\\)",
+                        Pattern.CASE_INSENSITIVE)
+                .matcher(ddl);
+        while (inlineIndexMatcher.find()) {
+            indexedColumns.addAll(parseColumnList(inlineIndexMatcher.group(1)));
+        }
+        return new ArrayList<>(indexedColumns);
+    }
+
+    private String extractDefinitionBody(String ddl) {
+        if (ddl == null) {
+            return "";
+        }
+        int start = ddl.indexOf('(');
+        int end = ddl.lastIndexOf(')');
+        if (start < 0 || end <= start) {
+            return "";
+        }
+        return ddl.substring(start + 1, end);
+    }
+
+    private List<String> splitTopLevelDefinitions(String body) {
+        List<String> definitions = new ArrayList<>();
+        if (body == null || body.isBlank()) {
+            return definitions;
+        }
+        int depth = 0;
+        StringBuilder current = new StringBuilder();
+        for (int i = 0; i < body.length(); i++) {
+            char ch = body.charAt(i);
+            if (ch == '(') {
+                depth++;
+            } else if (ch == ')' && depth > 0) {
+                depth--;
+            }
+            if (ch == ',' && depth == 0) {
+                definitions.add(current.toString());
+                current.setLength(0);
+            } else {
+                current.append(ch);
+            }
+        }
+        if (current.length() > 0) {
+            definitions.add(current.toString());
+        }
+        return definitions;
+    }
+
+    private boolean isTableConstraint(String definition) {
+        String upper = definition.trim().toUpperCase(Locale.ROOT);
+        return upper.startsWith("PRIMARY KEY")
+                || upper.startsWith("UNIQUE KEY")
+                || upper.startsWith("UNIQUE INDEX")
+                || upper.startsWith("KEY ")
+                || upper.startsWith("INDEX ")
+                || upper.startsWith("FULLTEXT KEY")
+                || upper.startsWith("FULLTEXT INDEX")
+                || upper.startsWith("SPATIAL KEY")
+                || upper.startsWith("SPATIAL INDEX")
+                || upper.startsWith("CONSTRAINT ")
+                || upper.startsWith("FOREIGN KEY")
+                || upper.startsWith("CHECK ");
+    }
+
+    private List<String> parseColumnList(String rawColumns) {
+        if (rawColumns == null || rawColumns.isBlank()) {
+            return List.of();
+        }
+        Set<String> columns = new LinkedHashSet<>();
+        for (String part : rawColumns.split(",")) {
+            String column = part.trim()
+                    .replaceAll("`", "")
+                    .replaceAll("\"", "")
+                    .replaceAll("'","")
+                    .replaceAll("\\s+(ASC|DESC)\\b.*", "")
+                    .replaceAll("\\(.+$", "")
+                    .trim();
+            if (!column.isBlank()) {
+                columns.add(column);
+            }
+        }
+        return new ArrayList<>(columns);
     }
 
     /**

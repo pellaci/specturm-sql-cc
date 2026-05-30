@@ -20,6 +20,7 @@ public class DiagnosticReport {
     private Summary summary;
     private Hotspots hotspots;
     private Insights insights;
+    private SchemaAnalysis schemaAnalysis;
     private List<Finding> findings;
     private Diagnostics diagnostics;
     private ExecutiveSummary executiveSummary;
@@ -97,6 +98,54 @@ public class DiagnosticReport {
         private List<InsightItem> dangerousDml;
         private List<InsightItem> potentialInjection;
         private List<InsightItem> fullScanOrNoIndex;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SchemaAnalysis {
+        private boolean ddlDetected;
+        private int ddlFileCount;
+        private int tableCount;
+        private int referencedTableCount;
+        private int coveredTableCount;
+        private int missingDdlTableCount;
+        private int unindexedPredicateCount;
+        private List<SchemaTable> tables;
+        private List<SchemaRisk> risks;
+        private List<String> warnings;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SchemaTable {
+        private String tableName;
+        private String sourceFile;
+        private List<String> columns;
+        private List<String> primaryKeyColumns;
+        private List<String> indexedColumns;
+        private int referencedSqlCount;
+        private String coverage;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SchemaRisk {
+        private String sqlId;
+        private String riskType;
+        private String severity;
+        private String tableName;
+        private List<String> predicateColumns;
+        private List<String> indexedPredicateColumns;
+        private List<String> missingIndexColumns;
+        private List<String> locations;
+        private String evidence;
+        private String recommendation;
     }
 
     @Data

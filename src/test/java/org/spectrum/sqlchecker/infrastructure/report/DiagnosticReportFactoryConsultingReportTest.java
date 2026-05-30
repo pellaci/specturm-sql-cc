@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticAnalysisDto;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticIssue;
 import org.spectrum.sqlchecker.application.report.dto.DiagnosticReport;
+import org.spectrum.sqlchecker.application.scan.dto.SchemaAnalysisDto;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
 import org.spectrum.sqlchecker.application.scan.dto.SqlStatementDto;
 import org.spectrum.sqlchecker.domain.shared.enumeration.ExplainEligibility;
@@ -47,6 +48,59 @@ class DiagnosticReportFactoryConsultingReportTest {
         assertThat(report.getCampaigns()).isNotNull();
         assertThat(report.getConfidence()).isNotNull();
         assertThat(report.getMethodology()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("should expose DDL schema association in report model")
+    void should_expose_ddl_schema_association_in_report_model() {
+        DiagnosticReport report = DiagnosticReportFactory.from(ScanResult.builder()
+                .scanPath("/repo/installment-commodity")
+                .totalFiles(2)
+                .filesScanned(2)
+                .sqlFound(1)
+                .uniqueSqlFound(1)
+                .schemaAnalysis(SchemaAnalysisDto.builder()
+                        .ddlDetected(true)
+                        .ddlFileCount(1)
+                        .tableCount(1)
+                        .referencedTableCount(1)
+                        .coveredTableCount(1)
+                        .missingDdlTableCount(0)
+                        .unindexedPredicateCount(1)
+                        .tables(List.of(SchemaAnalysisDto.TableSummary.builder()
+                                .tableName("t_order")
+                                .sourceFile("schema.sql")
+                                .columns(List.of("id", "status"))
+                                .primaryKeyColumns(List.of("id"))
+                                .indexedColumns(List.of("id"))
+                                .referencedSqlCount(1)
+                                .coverage("REFERENCED")
+                                .build()))
+                        .risks(List.of(SchemaAnalysisDto.SqlSchemaRisk.builder()
+                                .sqlId("sql-order")
+                                .riskType("UNINDEXED_PREDICATE")
+                                .severity("WARNING")
+                                .tableName("t_order")
+                                .predicateColumns(List.of("status"))
+                                .indexedPredicateColumns(List.of())
+                                .missingIndexColumns(List.of("status"))
+                                .locations(List.of("mapper/OrderMapper.xml:10"))
+                                .evidence("过滤字段未在 DDL 索引列中命中: status")
+                                .recommendation("评估索引")
+                                .build()))
+                        .warnings(List.of())
+                        .build())
+                .sqlStatements(List.of(skippedExplainSql()))
+                .build());
+
+        assertThat(report.getSchemaAnalysis().isDdlDetected()).isTrue();
+        assertThat(report.getSchemaAnalysis().getRisks())
+                .extracting(DiagnosticReport.SchemaRisk::getRiskType)
+                .contains("UNINDEXED_PREDICATE");
+        assertThat(report.getExecutiveSummary().getRecommendedActions())
+                .anySatisfy(action -> assertThat(action).contains("DDL 关联分析"));
+        assertThat(report.getConfidence().getEvidenceSources())
+                .contains("DDL schema association");
     }
 
     @Test

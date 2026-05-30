@@ -82,6 +82,11 @@ public class ScanResult {
     private List<SqlStatementDto> sqlStatements;
 
     /**
+     * DDL 与 SQL 的静态关联分析（可选）
+     */
+    private SchemaAnalysisDto schemaAnalysis;
+
+    /**
      * 错误信息列表
      */
     private List<ScanError> errors;

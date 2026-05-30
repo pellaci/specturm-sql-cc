@@ -4,6 +4,7 @@ import org.spectrum.sqlchecker.application.analysis.dto.ExplainIssue;
 import org.spectrum.sqlchecker.application.analysis.dto.PlanNode;
 import org.spectrum.sqlchecker.application.analysis.dto.StaticIssue;
 import org.spectrum.sqlchecker.application.report.dto.DiagnosticReport;
+import org.spectrum.sqlchecker.application.scan.dto.SchemaAnalysisDto;
 import org.spectrum.sqlchecker.application.scan.dto.SqlLocationDto;
 import org.spectrum.sqlchecker.application.scan.dto.ScanResult;
 import org.spectrum.sqlchecker.application.scan.dto.SqlStatementDto;
@@ -93,7 +94,8 @@ public final class DiagnosticReportFactory {
                 .manualReview(manualReview(sqlStatements))
                 .configWarnings(explainFailures(sqlStatements))
                 .build();
-        DiagnosticReport.Confidence confidence = buildConfidence(summary, diagnostics);
+        DiagnosticReport.SchemaAnalysis schemaAnalysis = toSchemaAnalysis(result.getSchemaAnalysis());
+        DiagnosticReport.Confidence confidence = buildConfidence(summary, diagnostics, schemaAnalysis);
         List<DiagnosticReport.RemediationCampaign> campaigns = buildCampaigns(findings);
         DiagnosticReport.Remediation remediation = buildRemediation(findings, campaigns);
 
@@ -112,9 +114,10 @@ public final class DiagnosticReportFactory {
                         .bySeverity(topSeverityStats(critical, warning, info, Math.max(1, totalIssues)))
                         .build())
                 .insights(buildInsights(sqlStatements))
+                .schemaAnalysis(schemaAnalysis)
                 .findings(findings)
                 .diagnostics(diagnostics)
-                .executiveSummary(buildExecutiveSummary(result, summary, confidence, diagnostics, sqlStatements))
+                .executiveSummary(buildExecutiveSummary(result, summary, confidence, diagnostics, sqlStatements, schemaAnalysis))
                 .campaigns(campaigns)
                 .confidence(confidence)
                 .methodology(defaultMethodology())
@@ -175,6 +178,72 @@ public final class DiagnosticReportFactory {
                 List.of("定位 MyBatis 动态分支、数据库方言或占位符归一化问题，补齐最小样例后重新扫描。"),
                 List.of("重新扫描并确认 UNKNOWN/SQL_SYNTAX_ERROR 已下降，或被归类到明确规则。")));
         return campaigns;
+    }
+
+    private static DiagnosticReport.SchemaAnalysis toSchemaAnalysis(SchemaAnalysisDto schemaAnalysis) {
+        if (schemaAnalysis == null) {
+            return DiagnosticReport.SchemaAnalysis.builder()
+                    .ddlDetected(false)
+                    .ddlFileCount(0)
+                    .tableCount(0)
+                    .referencedTableCount(0)
+                    .coveredTableCount(0)
+                    .missingDdlTableCount(0)
+                    .unindexedPredicateCount(0)
+                    .tables(List.of())
+                    .risks(List.of())
+                    .warnings(List.of("未生成 DDL 关联分析。"))
+                    .build();
+        }
+        return DiagnosticReport.SchemaAnalysis.builder()
+                .ddlDetected(schemaAnalysis.isDdlDetected())
+                .ddlFileCount(schemaAnalysis.getDdlFileCount())
+                .tableCount(schemaAnalysis.getTableCount())
+                .referencedTableCount(schemaAnalysis.getReferencedTableCount())
+                .coveredTableCount(schemaAnalysis.getCoveredTableCount())
+                .missingDdlTableCount(schemaAnalysis.getMissingDdlTableCount())
+                .unindexedPredicateCount(schemaAnalysis.getUnindexedPredicateCount())
+                .tables(toSchemaTables(schemaAnalysis.getTables()))
+                .risks(toSchemaRisks(schemaAnalysis.getRisks()))
+                .warnings(schemaAnalysis.getWarnings() != null ? schemaAnalysis.getWarnings() : List.of())
+                .build();
+    }
+
+    private static List<DiagnosticReport.SchemaTable> toSchemaTables(List<SchemaAnalysisDto.TableSummary> tables) {
+        if (tables == null || tables.isEmpty()) {
+            return List.of();
+        }
+        return tables.stream()
+                .map(table -> DiagnosticReport.SchemaTable.builder()
+                        .tableName(table.getTableName())
+                        .sourceFile(table.getSourceFile())
+                        .columns(table.getColumns() != null ? table.getColumns() : List.of())
+                        .primaryKeyColumns(table.getPrimaryKeyColumns() != null ? table.getPrimaryKeyColumns() : List.of())
+                        .indexedColumns(table.getIndexedColumns() != null ? table.getIndexedColumns() : List.of())
+                        .referencedSqlCount(table.getReferencedSqlCount())
+                        .coverage(table.getCoverage())
+                        .build())
+                .toList();
+    }
+
+    private static List<DiagnosticReport.SchemaRisk> toSchemaRisks(List<SchemaAnalysisDto.SqlSchemaRisk> risks) {
+        if (risks == null || risks.isEmpty()) {
+            return List.of();
+        }
+        return risks.stream()
+                .map(risk -> DiagnosticReport.SchemaRisk.builder()
+                        .sqlId(risk.getSqlId())
+                        .riskType(risk.getRiskType())
+                        .severity(risk.getSeverity())
+                        .tableName(risk.getTableName())
+                        .predicateColumns(risk.getPredicateColumns() != null ? risk.getPredicateColumns() : List.of())
+                        .indexedPredicateColumns(risk.getIndexedPredicateColumns() != null ? risk.getIndexedPredicateColumns() : List.of())
+                        .missingIndexColumns(risk.getMissingIndexColumns() != null ? risk.getMissingIndexColumns() : List.of())
+                        .locations(risk.getLocations() != null ? risk.getLocations() : List.of())
+                        .evidence(risk.getEvidence())
+                        .recommendation(risk.getRecommendation())
+                        .build())
+                .toList();
     }
 
     private static DiagnosticReport.Remediation buildRemediation(
@@ -666,7 +735,8 @@ public final class DiagnosticReportFactory {
             DiagnosticReport.Summary summary,
             DiagnosticReport.Confidence confidence,
             DiagnosticReport.Diagnostics diagnostics,
-            List<SqlStatementDto> sqlStatements) {
+            List<SqlStatementDto> sqlStatements,
+            DiagnosticReport.SchemaAnalysis schemaAnalysis) {
         List<String> topRules = countByRule(sqlStatements).entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(3)
@@ -680,6 +750,10 @@ public final class DiagnosticReportFactory {
         if (hasRule(sqlStatements, IssueType.SELECT_WITHOUT_WHERE.name())
                 || hasRule(sqlStatements, IssueType.ORDER_BY_WITHOUT_LIMIT.name())) {
             actions.add("P1: 收敛无边界读取和排序分页风险。");
+        }
+        if (schemaAnalysis != null && schemaAnalysis.isDdlDetected()
+                && (schemaAnalysis.getUnindexedPredicateCount() > 0 || schemaAnalysis.getMissingDdlTableCount() > 0)) {
+            actions.add("P1: 按 DDL 关联分析复核表结构、索引覆盖和缺失 schema 证据。");
         }
         if (actions.isEmpty()) {
             actions.add("P2: 保留当前报告作为治理基线，持续关注人工复核项。");
@@ -700,11 +774,15 @@ public final class DiagnosticReportFactory {
 
     private static DiagnosticReport.Confidence buildConfidence(
             DiagnosticReport.Summary summary,
-            DiagnosticReport.Diagnostics diagnostics) {
+            DiagnosticReport.Diagnostics diagnostics,
+            DiagnosticReport.SchemaAnalysis schemaAnalysis) {
         List<String> sources = new ArrayList<>();
         sources.add("Static AST rules");
         if (summary.getCoverage().getExplainCoverage() > 0) {
             sources.add("EXPLAIN evidence");
+        }
+        if (schemaAnalysis != null && schemaAnalysis.isDdlDetected()) {
+            sources.add("DDL schema association");
         }
 
         List<String> limits = new ArrayList<>();
@@ -717,11 +795,15 @@ public final class DiagnosticReportFactory {
         if (!diagnostics.getParseFailures().isEmpty()) {
             limits.add("部分 SQL 需要修正模板或占位符后再进入精确诊断。");
         }
+        if (schemaAnalysis != null && schemaAnalysis.isDdlDetected() && schemaAnalysis.getMissingDdlTableCount() > 0) {
+            limits.add("部分 SQL 引用表缺少项目内 DDL，schema 关联结论需要补充迁移文件或 schema-path。");
+        }
 
         String level = diagnostics.getParseFailures().isEmpty()
                 && diagnostics.getManualReview().isEmpty()
                 && diagnostics.getSkippedExplain().isEmpty()
                 && diagnostics.getConfigWarnings().isEmpty()
+                && (schemaAnalysis == null || schemaAnalysis.getMissingDdlTableCount() == 0)
                 ? "STRONG"
                 : "NEEDS_REVIEW";
         return DiagnosticReport.Confidence.builder()
@@ -750,10 +832,12 @@ public final class DiagnosticReportFactory {
                 .coverageDefinitions(List.of(
                         "Parse coverage measures SQL statements accepted by preprocessing and classification.",
                         "EXPLAIN coverage measures eligible SQL with successful execution-plan evidence.",
+                        "DDL association coverage measures whether referenced SQL tables can be matched to project DDL.",
                         "Manual review marks dynamic templates, skipped EXPLAIN, and evidence gaps."))
                 .knownLimits(List.of(
                         "Static analysis cannot prove runtime parameter values.",
                         "Database-free reports do not include real optimizer evidence.",
+                        "DDL association is conservative and depends on scanned migration/schema files.",
                         "Dynamic SQL templates may require manual review even when parse coverage is 100%."))
                 .build();
     }

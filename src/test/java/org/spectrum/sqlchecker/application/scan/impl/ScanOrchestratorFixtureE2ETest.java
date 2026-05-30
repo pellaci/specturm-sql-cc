@@ -51,10 +51,10 @@ class ScanOrchestratorFixtureE2ETest {
                 null
         );
 
-        assertThat(result.getStatistics().getTotalFiles()).isEqualTo(3);
-        assertThat(result.getStatistics().getSqlFound()).isEqualTo(4);
-        assertThat(result.getStatistics().getSqlParsed()).isEqualTo(4);
-        assertThat(result.getSqlEntries()).hasSize(4);
+        assertThat(result.getStatistics().getTotalFiles()).isEqualTo(4);
+        assertThat(result.getStatistics().getSqlFound()).isEqualTo(5);
+        assertThat(result.getStatistics().getSqlParsed()).isEqualTo(5);
+        assertThat(result.getSqlEntries()).hasSize(5);
 
         Set<SqlSourceType> sourceTypes = result.getSqlEntries().stream()
                 .flatMap(entry -> entry.getLocations().stream())
@@ -65,6 +65,10 @@ class ScanOrchestratorFixtureE2ETest {
                 .contains(SqlSourceType.STRING_LITERAL, SqlSourceType.MYBATIS, SqlSourceType.JAVASCRIPT);
 
         assertThat(result.getIssueSummary()).containsEntry("SELECT_STAR", 1);
+        assertThat(result.getScanResult().getSchemaAnalysis()).isNotNull();
+        assertThat(result.getScanResult().getSchemaAnalysis().isDdlDetected()).isTrue();
+        assertThat(result.getScanResult().getSchemaAnalysis().getTableCount()).isEqualTo(1);
+        assertThat(result.getScanResult().getSchemaAnalysis().getUnindexedPredicateCount()).isGreaterThanOrEqualTo(1);
 
         Path reportPath = tempDir.resolve("mixed-repo-report.json");
         reportService.generateJsonReport(result.getScanResult(), reportPath.toString());
@@ -75,6 +79,9 @@ class ScanOrchestratorFixtureE2ETest {
         assertThat(json).contains("\"confidence\"");
         assertThat(json).contains("\"methodology\"");
         assertThat(json).contains("\"remediation\"");
+        assertThat(json).contains("\"schemaAnalysis\"");
+        assertThat(json).contains("\"ddlDetected\":true");
+        assertThat(json).contains("UNINDEXED_PREDICATE");
         assertThat(json).contains("\"tasks\"");
         assertThat(json).contains("\"recipes\"");
         assertThat(json).contains("\"taskCount\"");

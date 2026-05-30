@@ -32,6 +32,7 @@ import org.spectrum.sqlchecker.infrastructure.database.ConnectionManager;
 import org.spectrum.sqlchecker.infrastructure.extractor.MyBatisSqlExtractor;
 import org.spectrum.sqlchecker.infrastructure.rule.SqlRuleEngine;
 import org.spectrum.sqlchecker.infrastructure.scan.SqlScanSupport;
+import org.spectrum.sqlchecker.infrastructure.schema.SchemaRiskAnalyzer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -72,6 +73,9 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
 
     @Autowired(required = false)
     private SqlExtractorFactory sqlExtractorFactory;
+
+    @Autowired(required = false)
+    private SchemaRiskAnalyzer schemaRiskAnalyzer;
 
     @Override
     public ScanExecutionResult execute(ScanExecutionRequest request, ScanProgressListener listener) {
@@ -118,6 +122,7 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         computeIssueSummary(context);
 
         ScanResult scanResult = buildScanResult(context);
+        attachSchemaAnalysis(scanResult);
         ScanStatistics statistics = ScanStatistics.builder()
                 .totalFiles(context.totalFiles)
                 .javaFiles(context.javaFiles)
@@ -140,6 +145,19 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                 .sqlEntries(new ArrayList<>(context.sqlEntries.values()))
                 .scanPath(request.getPath())
                 .build();
+    }
+
+    private void attachSchemaAnalysis(ScanResult scanResult) {
+        if (schemaRiskAnalyzer == null || scanResult == null || scanResult.getScanPath() == null) {
+            return;
+        }
+        try {
+            scanResult.setSchemaAnalysis(schemaRiskAnalyzer.analyze(
+                    Path.of(scanResult.getScanPath()),
+                    scanResult.getSqlStatements()));
+        } catch (Exception e) {
+            log.debug("Schema risk analysis skipped: {}", e.getMessage());
+        }
     }
 
     private void updateProgress(ScanContext context, ScanProgressListener listener, String currentFile) {
