@@ -89,6 +89,46 @@ class ScanOrchestratorFixtureE2ETest {
     }
 
     @Test
+    @DisplayName("应该使用 schema-path 中的外置 DDL 做关联分析")
+    void should_use_external_schema_path_for_ddl_association() throws IOException {
+        Path repoRoot = tempDir.resolve("service-repo");
+        write(repoRoot.resolve("src/main/resources/mapper/OrderMapper.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <mapper namespace="example.OrderMapper">
+                    <select id="findOrders">
+                        SELECT id FROM t_order WHERE user_id = #{userId} AND status = #{status}
+                    </select>
+                </mapper>
+                """);
+        Path schemaRoot = tempDir.resolve("external-ddl");
+        write(schemaRoot.resolve("schema.sql"), """
+                CREATE TABLE t_order (
+                  id BIGINT PRIMARY KEY,
+                  user_id BIGINT NOT NULL,
+                  status VARCHAR(16),
+                  KEY idx_user_id (user_id)
+                );
+                """);
+
+        ScanExecutionResult result = scanOrchestrator.execute(
+                ScanExecutionRequest.builder()
+                        .path(repoRoot.toString())
+                        .schemaPath(schemaRoot.toString())
+                        .build(),
+                null
+        );
+
+        assertThat(result.getStatistics().getSqlFiles()).isZero();
+        assertThat(result.getScanResult().getSchemaAnalysis()).isNotNull();
+        assertThat(result.getScanResult().getSchemaAnalysis().isDdlDetected()).isTrue();
+        assertThat(result.getScanResult().getSchemaAnalysis().getSchemaPath())
+                .isEqualTo(schemaRoot.toAbsolutePath().normalize().toString());
+        assertThat(result.getScanResult().getSchemaAnalysis().getTableCount()).isEqualTo(1);
+        assertThat(result.getScanResult().getSchemaAnalysis().getUnindexedPredicateCount()).isEqualTo(1);
+        assertThat(result.getScanResult().getSchemaAnalysis().getWarnings()).isEmpty();
+    }
+
+    @Test
     @DisplayName("应该处理混合文件、重复 SQL、忽略目录和解析失败 fallback")
     void should_handle_complex_fixture_cases() throws IOException {
         Path repoRoot = tempDir.resolve("complex-repo");

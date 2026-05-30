@@ -122,7 +122,7 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
         computeIssueSummary(context);
 
         ScanResult scanResult = buildScanResult(context);
-        attachSchemaAnalysis(scanResult);
+        attachSchemaAnalysis(scanResult, request);
         ScanStatistics statistics = ScanStatistics.builder()
                 .totalFiles(context.totalFiles)
                 .javaFiles(context.javaFiles)
@@ -147,13 +147,16 @@ public class ScanOrchestratorImpl implements ScanOrchestrator {
                 .build();
     }
 
-    private void attachSchemaAnalysis(ScanResult scanResult) {
+    private void attachSchemaAnalysis(ScanResult scanResult, ScanExecutionRequest request) {
         if (schemaRiskAnalyzer == null || scanResult == null || scanResult.getScanPath() == null) {
             return;
         }
         try {
+            Path schemaRoot = request != null && request.getSchemaPath() != null && !request.getSchemaPath().isBlank()
+                    ? Path.of(request.getSchemaPath())
+                    : Path.of(scanResult.getScanPath());
             scanResult.setSchemaAnalysis(schemaRiskAnalyzer.analyze(
-                    Path.of(scanResult.getScanPath()),
+                    schemaRoot,
                     scanResult.getSqlStatements()));
         } catch (Exception e) {
             log.debug("Schema risk analysis skipped: {}", e.getMessage());

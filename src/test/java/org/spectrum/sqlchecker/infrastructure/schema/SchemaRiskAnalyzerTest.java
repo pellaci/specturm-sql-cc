@@ -42,6 +42,7 @@ class SchemaRiskAnalyzerTest {
                 .build()));
 
         assertThat(analysis.isDdlDetected()).isTrue();
+        assertThat(analysis.getSchemaPath()).isEqualTo(tempDir.toAbsolutePath().normalize().toString());
         assertThat(analysis.getTableCount()).isEqualTo(1);
         assertThat(analysis.getCoveredTableCount()).isEqualTo(1);
         assertThat(analysis.getUnindexedPredicateCount()).isEqualTo(1);
@@ -53,6 +54,26 @@ class SchemaRiskAnalyzerTest {
                     assertThat(risk.getMissingIndexColumns()).contains("status", "created_at");
                     assertThat(risk.getLocations()).contains("mapper/OrderMapper.xml:12");
                 });
+    }
+
+    @Test
+    @DisplayName("should report missing schema path as evidence warning")
+    void should_report_missing_schema_path_as_evidence_warning(@TempDir Path tempDir) {
+        Path missingSchemaPath = tempDir.resolve("missing-ddl");
+        SchemaRiskAnalyzer analyzer = new SchemaRiskAnalyzer(new DdlExtractor());
+
+        SchemaAnalysisDto analysis = analyzer.analyze(missingSchemaPath, List.of(SqlStatementDto.builder()
+                .id("sql-user")
+                .sqlType(SqlType.SELECT)
+                .originalSql("SELECT id FROM users WHERE status = ?")
+                .normalizedSql("SELECT id FROM users WHERE status = ?")
+                .validity(ValidityStatus.VALID)
+                .locations(List.of(location("mapper/UserMapper.xml")))
+                .build()));
+
+        assertThat(analysis.isDdlDetected()).isFalse();
+        assertThat(analysis.getSchemaPath()).isEqualTo(missingSchemaPath.toAbsolutePath().normalize().toString());
+        assertThat(analysis.getWarnings()).anySatisfy(warning -> assertThat(warning).contains("DDL 证据路径不存在"));
     }
 
     @Test

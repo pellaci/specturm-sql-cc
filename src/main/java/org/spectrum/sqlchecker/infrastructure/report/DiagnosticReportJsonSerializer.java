@@ -113,6 +113,7 @@ public final class DiagnosticReportJsonSerializer {
 
     private static void appendSchemaAnalysis(StringBuilder sb, DiagnosticReport.SchemaAnalysis schemaAnalysis) {
         boolean first = beginObject(sb);
+        first = fieldString(sb, first, "schemaPath", schemaAnalysis.getSchemaPath());
         first = fieldBoolean(sb, first, "ddlDetected", schemaAnalysis.isDdlDetected());
         first = fieldNumber(sb, first, "ddlFileCount", schemaAnalysis.getDdlFileCount());
         first = fieldNumber(sb, first, "tableCount", schemaAnalysis.getTableCount());

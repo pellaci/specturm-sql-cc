@@ -57,13 +57,16 @@ public class SchemaRiskAnalyzer {
             }
         }
         List<String> warnings = new ArrayList<>();
-        if (ddlTables.isEmpty()) {
-            warnings.add("未在扫描范围内发现 CREATE TABLE DDL，无法进行表结构关联分析。");
+        if (scanPath == null || !Files.exists(scanPath)) {
+            warnings.add("DDL 证据路径不存在，无法进行表结构关联分析: " + schemaPathLabel(scanPath));
+        } else if (ddlTables.isEmpty()) {
+            warnings.add("未在扫描范围内发现 CREATE TABLE DDL，无法进行表结构关联分析。证据路径: " + schemaPathLabel(scanPath));
         } else if (covered < usages.size()) {
             warnings.add("部分 SQL 引用的表未在项目 DDL 中出现，需确认 DDL 是否完整或由迁移系统托管。");
         }
 
         return SchemaAnalysisDto.builder()
+                .schemaPath(schemaPathLabel(scanPath))
                 .ddlDetected(!ddlTables.isEmpty())
                 .ddlFileCount(countDdlFiles(ddlTables))
                 .tableCount(ddlTables.size())
@@ -91,6 +94,13 @@ public class SchemaRiskAnalyzer {
             log.debug("Failed to inspect DDL under {}: {}", scanPath, e.getMessage());
         }
         return tables;
+    }
+
+    private String schemaPathLabel(Path scanPath) {
+        if (scanPath == null) {
+            return "";
+        }
+        return scanPath.toAbsolutePath().normalize().toString();
     }
 
     private void readDdlFile(Path root, Path path, Map<String, TableInfo> tables) {

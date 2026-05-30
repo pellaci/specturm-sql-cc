@@ -16,6 +16,7 @@ import java.util.List;
 @AllArgsConstructor
 public class SchemaAnalysisDto {
 
+    private String schemaPath;
     private boolean ddlDetected;
     private int ddlFileCount;
     private int tableCount;

@@ -199,10 +199,13 @@ class ReportServiceImplTest {
 
         String json = Files.readString(jsonOutput);
         String html = Files.readString(htmlOutput);
+        assertThat(json).contains("\"schemaPath\":\"/tmp/project/db/schema\"");
         assertThat(json).contains("\"ddlDetected\":true");
         assertThat(json).contains("\"riskType\":\"UNINDEXED_PREDICATE\"");
         assertThat(json).contains("\"missingIndexColumns\":[\"status\"]");
         assertThat(html).contains("DDL 关联风险分析");
+        assertThat(html).contains("DDL 证据源");
+        assertThat(html).contains("/tmp/project/db/schema");
         assertThat(html).contains("t_order · UNINDEXED_PREDICATE");
         assertThat(html).contains("疑似未索引谓词");
     }
@@ -1058,6 +1061,7 @@ class ReportServiceImplTest {
                 .build();
 
         SchemaAnalysisDto schemaAnalysis = SchemaAnalysisDto.builder()
+                .schemaPath("/tmp/project/db/schema")
                 .ddlDetected(true)
                 .ddlFileCount(1)
                 .tableCount(1)

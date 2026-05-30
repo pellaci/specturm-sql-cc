@@ -917,6 +917,9 @@
                 <p class="section-subtitle">把项目内 DDL 与已扫描 SQL 关联，用于判断表结构证据、索引覆盖和需要补充 schema 的位置。</p>
             </div>
         </div>
+        <div class="panel" style="margin-bottom:16px;">
+            <div class="field"><span>DDL 证据源</span><div>{% if report.schemaAnalysis.schemaPath is not empty %}{{ report.schemaAnalysis.schemaPath }}{% else %}未配置，默认使用扫描目录{% endif %}</div></div>
+        </div>
         <div class="grid metrics">
             <div class="metric"><div class="value">{{ report.schemaAnalysis.ddlFileCount }}</div><div class="label">DDL 文件</div></div>
             <div class="metric"><div class="value">{{ report.schemaAnalysis.tableCount }}</div><div class="label">DDL 表定义</div></div>

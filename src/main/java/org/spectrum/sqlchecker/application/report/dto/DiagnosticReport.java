@@ -105,6 +105,7 @@ public class DiagnosticReport {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class SchemaAnalysis {
+        private String schemaPath;
         private boolean ddlDetected;
         private int ddlFileCount;
         private int tableCount;

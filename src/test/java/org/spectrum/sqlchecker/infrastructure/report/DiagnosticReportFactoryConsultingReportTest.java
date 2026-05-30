@@ -60,6 +60,7 @@ class DiagnosticReportFactoryConsultingReportTest {
                 .sqlFound(1)
                 .uniqueSqlFound(1)
                 .schemaAnalysis(SchemaAnalysisDto.builder()
+                        .schemaPath("/repo/installment-commodity/db")
                         .ddlDetected(true)
                         .ddlFileCount(1)
                         .tableCount(1)
@@ -94,6 +95,7 @@ class DiagnosticReportFactoryConsultingReportTest {
                 .build());
 
         assertThat(report.getSchemaAnalysis().isDdlDetected()).isTrue();
+        assertThat(report.getSchemaAnalysis().getSchemaPath()).isEqualTo("/repo/installment-commodity/db");
         assertThat(report.getSchemaAnalysis().getRisks())
                 .extracting(DiagnosticReport.SchemaRisk::getRiskType)
                 .contains("UNINDEXED_PREDICATE");

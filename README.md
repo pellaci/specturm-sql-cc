@@ -69,6 +69,17 @@ target/sql-report/report.json
 
 EXPLAIN 默认关闭。启用前需要准备 `sqlchecker.yml` 并显式打开数据库连接自动初始化。
 
+`--schema-path` 不只服务于 EXPLAIN 初始化，也会被离线 DDL 关联分析使用。即使不连接数据库，也可以把业务代码目录和外置 DDL 目录分开传入：
+
+```bash
+java -jar target/sql-checker-1.2.0.jar scan \
+  -p /path/to/java-service \
+  -o target/sql-report/report.html \
+  --schema-path /path/to/ddl
+```
+
+报告会在 `DDL 关联风险分析` 中展示实际 DDL 证据源、表覆盖、缺失 DDL 表和疑似未索引谓词。没有发现 DDL 时，工具只给出全局证据缺口提示，不会把每张引用表刷成噪声风险。
+
 ```bash
 java -Dspring.datasource.url=jdbc:h2:mem:sqlchecker \
   -Dsqlchecker.database.auto-init=true \
@@ -214,6 +225,7 @@ JSON 顶层结构：
 - `manualReview` 表示动态模板、不确定规则证据或跳过 EXPLAIN 的人工确认项。
 - `skippedExplain` 表示未启用数据库、SQL 非只读、模板占位符不安全、数据库不可用或策略拒绝。
 - `remediation.tasks` 是建议的修复队列，不是自动改代码结果。
+- `schemaAnalysis` 表示离线 DDL 关联分析结果；`schemaPath` 是实际使用的 DDL 证据目录。
 
 ## Rules
 

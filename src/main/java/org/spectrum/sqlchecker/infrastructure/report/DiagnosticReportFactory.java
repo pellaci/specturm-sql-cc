@@ -183,6 +183,7 @@ public final class DiagnosticReportFactory {
     private static DiagnosticReport.SchemaAnalysis toSchemaAnalysis(SchemaAnalysisDto schemaAnalysis) {
         if (schemaAnalysis == null) {
             return DiagnosticReport.SchemaAnalysis.builder()
+                    .schemaPath("")
                     .ddlDetected(false)
                     .ddlFileCount(0)
                     .tableCount(0)
@@ -196,6 +197,7 @@ public final class DiagnosticReportFactory {
                     .build();
         }
         return DiagnosticReport.SchemaAnalysis.builder()
+                .schemaPath(schemaAnalysis.getSchemaPath())
                 .ddlDetected(schemaAnalysis.isDdlDetected())
                 .ddlFileCount(schemaAnalysis.getDdlFileCount())
                 .tableCount(schemaAnalysis.getTableCount())
